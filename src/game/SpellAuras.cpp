@@ -231,7 +231,7 @@ pAuraHandler AuraHandler[TOTAL_AURAS]=
     &Aura::HandleModSpellDamagePercentFromStat,             //174 SPELL_AURA_MOD_SPELL_DAMAGE_OF_STAT_PERCENT  implemented in Unit::SpellBaseDamageBonus (by default intellect, dependent from SPELL_AURA_MOD_SPELL_HEALING_OF_STAT_PERCENT)
     &Aura::HandleModSpellHealingPercentFromStat,            //175 SPELL_AURA_MOD_SPELL_HEALING_OF_STAT_PERCENT implemented in Unit::SpellBaseHealingBonus
     &Aura::HandleSpiritOfRedemption,                        //176 SPELL_AURA_SPIRIT_OF_REDEMPTION   only for Spirit of Redemption spell, die at aura end
-    &Aura::HandleAuraAoeCharm,                        //177 SPELL_AURA_AOE_CHARM
+    &Aura::HandleAuraAoeCharm,                              //177 SPELL_AURA_AOE_CHARM
     &Aura::HandleNoImmediateEffect,                         //178 SPELL_AURA_MOD_DEBUFF_RESISTANCE          implemented in Unit::MagicSpellHitResult
     &Aura::HandleNoImmediateEffect,                         //179 SPELL_AURA_MOD_ATTACKER_SPELL_CRIT_CHANCE implemented in Unit::SpellCriticalBonus
     &Aura::HandleNoImmediateEffect,                         //180 SPELL_AURA_MOD_FLAT_SPELL_DAMAGE_VERSUS   implemented in Unit::SpellDamageBonus
@@ -319,10 +319,10 @@ pAuraHandler AuraHandler[TOTAL_AURAS]=
 };
 
 Aura::Aura(SpellEntry const* spellproto, uint32 eff, int32 *currentBasePoints, Unit *target, Unit *caster, Item* castItem) :
-m_procCharges(0), m_stackAmount(1), m_isRemoved(false), m_spellmod(NULL), m_effIndex(eff), m_caster_guid(0), m_target(target),
+m_procCharges(0), m_stackAmount(1), m_spellmod(NULL), m_effIndex(eff), m_caster_guid(0), m_target(target),
 m_timeCla(1000), m_castItemGuid(castItem?castItem->GetGUID():0), m_auraSlot(MAX_AURAS),
 m_positive(false), m_permanent(false), m_isPeriodic(false), m_isTrigger(false), m_isAreaAura(false),
-m_isPersistent(false), m_removeMode(AURA_REMOVE_BY_DEFAULT), m_isRemovedOnShapeLost(true), m_in_use(false),
+m_isPersistent(false), m_updated(false), m_removeMode(AURA_REMOVE_BY_DEFAULT), m_isRemovedOnShapeLost(true), m_in_use(false),
 m_periodicTimer(0), m_amplitude(0), m_PeriodicEventId(0), m_AuraDRGroup(DIMINISHING_NONE)
 ,m_tickNumber(0)
 {
@@ -806,9 +806,6 @@ void PersistentAreaAura::Update(uint32 diff)
 
 void Aura::ApplyModifier(bool apply, bool Real)
 {
-    if ( IsRemoved() )
-        return;
-
     AuraType aura = m_modifier.m_auraname;
 
     m_in_use = true;
@@ -1106,7 +1103,6 @@ void Aura::_RemoveAura()
                 ((Player*)caster)->SendCooldownEvent(GetSpellProto());
         }
     }
-    m_isRemoved = true;
 }
 
 void Aura::SetAuraFlag(uint32 slot, bool add)
@@ -1517,9 +1513,6 @@ void Aura::TriggerSpell()
                     }
 //                    // Bloodmyst Tesla
 //                    case 31611: break;
-//                    // Doomfire
- 	
-
                     // Doomfire
                     case 31944:
                     {
