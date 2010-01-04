@@ -151,7 +151,7 @@ struct TRINITY_DLL_DECL boss_rage_winterchillAI : public hyjal_trashAI
 
         if(DecayTimer < diff)
         {
-            if(Unit *target = m_creature->getVictim())
+            if(Unit *target = SelectUnit(SELECT_TARGET_RANDOM, 0, 70, true))
                 DoCast(target, SPELL_DEATH_AND_DECAY);
             DecayTimer = 60000+rand()%20000;
             switch(rand()%2)
