@@ -104,7 +104,6 @@ World::World()
     m_startTime=m_gameTime;
     m_maxActiveSessionCount = 0;
     m_maxQueuedSessionCount = 0;
-    m_unqueuedSessions = 0;
     m_resultQueue = NULL;
     m_NextDailyQuestReset = 0;
     m_scheduledScripts = 0;
@@ -243,13 +242,9 @@ void World::AddSession_ (WorldSession* s)
     if(decrease_session)
         --Sessions;
 
-    if (pLimit > 0 && (Sessions - unqueuedSessions()) >= pLimit && s->GetSecurity () == SEC_PLAYER && !HasRecentlyDisconnected(s))
+    if (pLimit > 0 && Sessions >= pLimit && s->GetSecurity () == SEC_PLAYER)
     {
-        if(objmgr.IsUnqueuedAccount(s->GetAccountId()))
-        {
-            unqueuedSessions()++;
-        }
-        else
+        if(!objmgr.IsUnqueuedAccount(s->GetAccountId()) && !HasRecentlyDisconnected(s))
         {
             AddQueuedPlayer (s);
             UpdateMaxSessionCounters ();
@@ -362,7 +357,7 @@ bool World::RemoveQueuedPlayer(WorldSession* sess)
         --sessions;
 
     // accept first in queue
-    if( (!m_playerLimit || (sessions - unqueuedSessions()) < m_playerLimit) && !m_QueuedPlayer.empty() )
+    if( (!m_playerLimit || (sessions < m_playerLimit)) && !m_QueuedPlayer.empty() )
     {
         WorldSession* pop_sess = m_QueuedPlayer.front();
         pop_sess->SetInQueue(false);
@@ -2204,6 +2199,18 @@ void World::UpdateSessions( time_t diff )
         ///- and remove not active sessions from the list
         if(!itr->second->Update(diff))                      // As interval = 0
         {
+            if(!RemoveQueuedPlayer(itr->second))
+            {
+                if(getConfig(CONFIG_INTERVAL_DISCONNECT_TOLERANCE))
+                {
+                    std::pair<uint32, time_t> tPair;
+                    tPair.first = itr->second->GetAccountId();
+                    tPair.second = time(NULL);
+
+                    addDisconnectTime(tPair);
+                }
+            }
+
             WorldSession *temp = itr->second;
             m_sessions.erase(itr);
             delete temp;

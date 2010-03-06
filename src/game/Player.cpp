@@ -9285,7 +9285,7 @@ uint8 Player::_CanStoreItem_InBag( uint8 bag, ItemPosCountVec &dest, ItemPrototy
         return EQUIP_ERR_ITEM_DOESNT_GO_INTO_BAG;
 
     Bag* pBag = (Bag*)GetItemByPos( INVENTORY_SLOT_BAG_0, bag );
-    if( !pBag )
+    if (!pBag || pBag==pSrcItem)
         return EQUIP_ERR_ITEM_DOESNT_GO_INTO_BAG;
 
     ItemPrototype const* pBagProto = pBag->GetProto();
@@ -9542,6 +9542,11 @@ uint8 Player::_CanStoreItem( uint8 bag, uint8 slot, ItemPosCountVec &dest, uint3
         // search free slot in bag for place to
         if( bag == INVENTORY_SLOT_BAG_0 )                   // inventory
         {
+            // if src item is bag don't search empty slot to avoid puting bag into self
+            // it can happen because bag is removed after finding free slot which can be in swaping bag
+            //if (pItem->IsBag())
+            //    return EQUIP_ERR_ITEMS_CANT_BE_SWAPPED;
+
             // search free slot - keyring case
             if(pProto->BagFamily & BAG_FAMILY_MASK_KEYS)
             {
@@ -10179,6 +10184,10 @@ uint8 Player::CanUnequipItem( uint16 pos, bool swap ) const
             if( bg->isArena() && bg->GetStatus() == STATUS_IN_PROGRESS )
                 return EQUIP_ERR_NOT_DURING_ARENA_MATCH;
     }
+
+    // prevent swaping bags if player is trading
+    if (swap && pItem->IsBag() && pTrader)
+        return EQUIP_ERR_ITEMS_CANT_BE_SWAPPED;
 
     if(!swap && pItem->IsBag() && !((Bag*)pItem)->IsEmpty())
         return EQUIP_ERR_CAN_ONLY_DO_WITH_EMPTY_BAGS;
