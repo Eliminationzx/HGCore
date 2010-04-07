@@ -32,12 +32,6 @@ struct TRINITY_DLL_DECL boss_kazrogalAI : public hyjal_trashAI
         pInstance = ((ScriptedInstance*)c->GetInstanceData());
         go = false;
         pos = 0;
-        SpellEntry *TempSpell = (SpellEntry*)GetSpellStore()->LookupEntry(SPELL_MARK);
-        if(TempSpell && TempSpell->EffectImplicitTargetA[0] != 1)
-        {
-            TempSpell->EffectImplicitTargetA[0] = 1;
-            TempSpell->EffectImplicitTargetB[0] = 0;
-        }
     }
 
     uint32 CleaveTimer;
@@ -168,7 +162,7 @@ struct TRINITY_DLL_DECL boss_kazrogalAI : public hyjal_trashAI
 
         if(CrippleTimer < diff)
         {
-            if(Unit *target = SelectUnit(SELECT_TARGET_RANDOM,1,90,true, m_creature->getVictim()))
+            if(Unit *target = SelectUnit(SELECT_TARGET_RANDOM,1,20,true))
                 DoCast(target, SPELL_CRIPPLE);
 
             CrippleTimer = 20000+rand()%10000;
@@ -176,16 +170,13 @@ struct TRINITY_DLL_DECL boss_kazrogalAI : public hyjal_trashAI
         else
             CrippleTimer -= diff;
 
-        if(m_creature->HasAura(SPELL_MARK,0))
-            m_creature->RemoveAurasDueToSpell(SPELL_MARK);
-
         if(MarkTimer < diff)
         {
             m_creature->CastSpell(m_creature, SPELL_MARK, false);
 
             MarkTimerBase -= 5000;
 
-            if(MarkTimerBase < 5500)
+            if(MarkTimerBase <= 5500)
                 MarkTimerBase = 10500;
 
             MarkTimer = MarkTimerBase;
