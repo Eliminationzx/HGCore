@@ -707,15 +707,19 @@ struct TRINITY_DLL_DECL Mob_EventAI : public ScriptedAI
 
                 if (param3)
                     pCreature = DoSpawnCreature(param1, 0, 0, 0, 0, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, param3);
-                else pCreature = pCreature = DoSpawnCreature(param1, 0, 0, 0, 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 0);
+                else
+                    pCreature = pCreature = DoSpawnCreature(param1, 0, 0, 0, 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 0);
 
                 if (!pCreature)
                 {
                     if (EAI_ErrorLevel > 0)
                         error_db_log( "TSCR: EventAI failed to spawn creature %u. Spawn event %d is on creature %d", param1, EventId, m_creature->GetEntry());
                 }
-                else if (param2 != TARGET_T_SELF && target)
-                    pCreature->AI()->AttackStart(target);
+                else
+                {
+                    if (param2 != TARGET_T_SELF && target)
+                        pCreature->AI()->AttackStart(target);
+                }
             }
             break;
         case ACTION_T_THREAT_SINGLE_PCT:
@@ -917,8 +921,11 @@ struct TRINITY_DLL_DECL Mob_EventAI : public ScriptedAI
                     if (EAI_ErrorLevel > 0)
                         error_db_log( "TSCR: EventAI failed to spawn creature %u. EventId %d.Creature %d", param1, EventId, m_creature->GetEntry());
                 }
-                else if (param2 != TARGET_T_SELF && target)
-                pCreature->AI()->AttackStart(target);
+                else
+                {
+                    if (param2 != TARGET_T_SELF && target)
+                        pCreature->AI()->AttackStart(target);
+                }
             }
             break;
         case ACTION_T_KILLED_MONSTER:
@@ -1149,6 +1156,17 @@ struct TRINITY_DLL_DECL Mob_EventAI : public ScriptedAI
     {
         if (!pUnit)
             return;
+
+        //set level and hp summoned unit
+        uint32 startHp = pUnit->GetMaxHealth();
+
+                                  //dest lvl                        start lvl
+        uint32 destHp = startHp * (m_creature->getLevel() / ((float)pUnit->getLevel()));
+
+        pUnit->SetLevel(m_creature->getLevel());
+
+        pUnit->SetHealth((uint32)destHp);
+        pUnit->SetMaxHealth((uint32)destHp);
 
         for (std::list<EventHolder>::iterator i = EventList.begin(); i != EventList.end(); ++i)
         {
