@@ -9747,6 +9747,10 @@ uint8 Player::_CanStoreItem( uint8 bag, uint8 slot, ItemPosCountVec &dest, uint3
         }
     }
 
+    // Normally it would be impossible to autostore not empty bags
+    if(pItem->IsBag() && !((Bag*)pItem)->IsEmpty())
+        return EQUIP_ERR_NONEMPTY_BAG_OVER_OTHER_BAG;
+
     // search free slot
     res = _CanStoreItem_InInventorySlots(INVENTORY_SLOT_ITEM_START,INVENTORY_SLOT_ITEM_END,dest,pProto,count,false,pItem,bag,slot);
     if(res!=EQUIP_ERR_OK)
@@ -15587,29 +15591,29 @@ InstancePlayerBind* Player::BindToInstance(InstanceSave *save, bool permanent, b
 
 void Player::SendRaidInfo()
 {
+    uint32 counter = 0;
+
     WorldPacket data(SMSG_RAID_INSTANCE_INFO, 4);
 
-    uint32 counter = 0, i;
-    for(i = 0; i < TOTAL_DIFFICULTIES; i++)
-        for (BoundInstancesMap::iterator itr = m_boundInstances[i].begin(); itr != m_boundInstances[i].end(); ++itr)
-            if(itr->second.perm) counter++;
+    size_t p_counter = data.wpos();
 
-    data << counter;
-    for(i = 0; i < TOTAL_DIFFICULTIES; i++)
+    for(uint32 i = 0; i < TOTAL_DIFFICULTIES; i++)
     {
         for (BoundInstancesMap::iterator itr = m_boundInstances[i].begin(); itr != m_boundInstances[i].end(); ++itr)
         {
             if(itr->second.perm)
             {
                 InstanceSave *save = itr->second.save;
-                data << (save->GetMapId());
-                data << (uint32)(save->GetResetTime() - time(NULL));
-                data << save->GetInstanceId();
+                data << uint32(save->GetMapId());           // map id
+                data << uint32(save->GetResetTime() - time(NULL));
+                data << uint32(save->GetInstanceId());      // instance id
                 data << uint32(counter);
-                counter--;
+                counter++;
             }
         }
     }
+
+    data.put<uint32>(p_counter, counter);
     GetSession()->SendPacket(&data);
 }
 

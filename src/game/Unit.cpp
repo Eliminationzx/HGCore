@@ -288,12 +288,8 @@ void Unit::Update( uint32 p_time )
 
     sWorld.m_spellUpdateLock.acquire();
         m_Events.Update( p_time );
+        _UpdateSpells( p_time );
     sWorld.m_spellUpdateLock.release();
-
-    if (!IsInWorld())
-        return;
-
-    _UpdateSpells( p_time );
 
     // update combat timer only for players and pets
     if (isInCombat() && isCharmedOwnedByPlayerOrPlayer())
@@ -3936,10 +3932,14 @@ void Unit::RemoveAura(AuraMap::iterator &i, AuraRemoveMode mode)
     Aura* Aur = i->second;
 
     // HACK: teleport players that leave Incite Chaos 2yds up to prevent falling into textures
-    if(Aur && Aur->GetId() == 33684)
+    if(Aur)
     {
-        if(this->GetTypeId() == TYPEID_PLAYER)
-            ((Player*)this)->TeleportTo(this->GetMapId(), this->GetPositionX(), this->GetPositionY(), (this->GetPositionZ() + 2.0), this->GetOrientation(), TELE_TO_NOT_LEAVE_COMBAT);
+        if (Aur->GetId() == 33684)
+            if(this->GetTypeId() == TYPEID_PLAYER)
+                ((Player*)this)->TeleportTo(this->GetMapId(), this->GetPositionX(), this->GetPositionY(), (this->GetPositionZ() + 2.0), this->GetOrientation(), TELE_TO_NOT_LEAVE_COMBAT);
+
+        if(this->GetTypeId() == TYPEID_UNIT && this->IsAIEnabled)
+            ((Creature*)this)->AI()->OnAuraRemove(Aur);
     }
 
     // if unit currently update aura list then make safe update iterator shift to next
@@ -7688,7 +7688,7 @@ int32 Unit::SpellBaseDamageBonusForVictim(SpellSchoolMask schoolMask, Unit *pVic
 bool Unit::isSpellCrit(Unit *pVictim, SpellEntry const *spellProto, SpellSchoolMask schoolMask, WeaponAttackType attackType)
 {
     // not critting spell
-    if((spellProto->AttributesEx2 & SPELL_ATTR_EX2_CANT_CRIT))
+    if(IS_CREATURE_GUID(GetGUID()) || spellProto->AttributesEx2 & SPELL_ATTR_EX2_CANT_CRIT)
         return false;
 
     float crit_chance = 0.0f;

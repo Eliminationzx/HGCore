@@ -531,6 +531,9 @@ void Aura::SetModifier(AuraType t, int32 a, uint32 pt, int32 miscValue)
 
 void Aura::Update(uint32 diff)
 {
+    if (!m_target)
+        return;
+
     if (m_duration > 0)
     {
         m_duration -= diff;
@@ -557,7 +560,7 @@ void Aura::Update(uint32 diff)
             }
         }
     }
-    
+
     // Scalding Water
     if(GetId() == 37284)
     {
@@ -583,7 +586,7 @@ void Aura::Update(uint32 diff)
         if(caster->GetUInt64Value(UNIT_FIELD_CHANNEL_OBJECT) == m_target->GetGUID())
         {
             float max_range = GetSpellMaxRange(sSpellRangeStore.LookupEntry(m_spellProto->rangeIndex));
-            
+
             if(Player* modOwner = caster->GetSpellModOwner())
                 modOwner->ApplySpellMod(GetId(), SPELLMOD_RANGE, max_range, NULL);
 
@@ -781,7 +784,7 @@ void PersistentAreaAura::Update(uint32 diff)
         DynamicObject *dynObj = NULL;
         if (m_dynamicObjectGUID)
             //dynObj = ObjectAccessor::GetDynamicObject(*caster, m_dynamicObjectGUID); // try to get linked dynamic object
-            dynObj = caster->GetMap()->GetDynamicObject(m_dynamicObjectGUID); //prev version commented, delete one 
+            dynObj = caster->GetMap()->GetDynamicObject(m_dynamicObjectGUID); //prev version commented, delete one
         else
             dynObj = caster->GetDynObject(GetId(), GetEffIndex()); // old way - do we need it?
 
@@ -1050,10 +1053,10 @@ void Aura::_RemoveAura()
             if(itr->second->GetAuraSlot() == slot)
             {
                 samespell = true;
-
                 break;
             }
         }
+
         if(samespell)
             break;
     }
@@ -1080,7 +1083,7 @@ void Aura::_RemoveAura()
             {
                  if((*i)->GetSpellProto()->SpellFamilyName == SPELLFAMILY_WARLOCK && (*i)->GetCasterGUID() != GetCasterGUID() && ((*i)->GetSpellProto()->SpellFamilyFlags & 4))
                  {
-                     m_target->ModifyAuraState(AURA_STATE_IMMOLATE, true); 
+                     m_target->ModifyAuraState(AURA_STATE_IMMOLATE, true);
                      break;
                  }
                  m_target->ModifyAuraState(AURA_STATE_IMMOLATE, false);
@@ -1624,7 +1627,7 @@ void Aura::TriggerSpell()
                                     GLapse->SetAuraDuration(duration);
                                     GLapse->UpdateAuraDuration();
                                 }
-                             
+
                                 caster->CastSpell(m_target, 39432, true);
                                 if(Aura* aur = caster->GetAura(39432, 0))
                                 {
@@ -1738,7 +1741,16 @@ void Aura::TriggerSpell()
 //                    // Murmur's Touch
 //                    case 38794: break;
 //                    // Activate Nether-wraith Beacon (31742 Nether-wraith Beacon item)
-//                    case 39105: break;
+                    case 39105:
+                    {
+                        if(!target)
+                            return;
+
+                        float fX, fY, fZ;
+                        target->GetClosePoint(fX, fY, fZ, target->GetObjectBoundingRadius(), 20.0f);
+                        target->SummonCreature(22408, fX, fY, fZ, target->GetOrientation(), TEMPSUMMON_DEAD_DESPAWN, 0);
+                        return;
+                    }
 //                    // Drain World Tree Visual
 //                    case 39140: break;
 //                    // Quest - Dustin's Undead Dragon Visual aura
@@ -3077,7 +3089,7 @@ void Aura::HandleAuraTransform(bool apply, bool Real)
         else
         {
             m_target->setTransForm(0);
-            
+
             // look for other transform auras
             Aura* handledAura = *otherTransforms.begin();
             for(Unit::AuraList::const_iterator i = otherTransforms.begin();i != otherTransforms.end(); ++i)
@@ -4893,7 +4905,7 @@ void Aura::HandleModPowerRegen(bool apply, bool Real)       // drinking
         Powers pt = m_target->getPowerType();
         if (pt == POWER_RAGE)
             m_periodicTimer = 3000;
-        else 
+        else
             m_periodicTimer = 2000;
 
         if(int32(pt) != m_modifier.m_miscvalue)
@@ -4912,7 +4924,7 @@ void Aura::HandleModPowerRegen(bool apply, bool Real)       // drinking
 
         // Warrior talent, gain 1 rage every 3 seconds while in combat
         // Anger Menagement
-        // amount = 1+ 16 = 17 = 3,4*5 = 10,2*5/3 
+        // amount = 1+ 16 = 17 = 3,4*5 = 10,2*5/3
         // so 17 is rounded amount for 5 sec tick grow ~ 1 range grow in 3 sec
         if(pt == POWER_RAGE)
         {
@@ -5617,8 +5629,8 @@ void Aura::HandleAuraModPacify(bool apply, bool Real)
         m_target->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PACIFIED);
     else
         m_target->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PACIFIED);
-        
-    
+
+
      if(m_spellProto->Id == 45839){
         if(apply){
             m_target->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
@@ -5993,7 +6005,7 @@ void Aura::PeriodicTick()
                         damageInfo.damage += (damageInfo.damage+1)/2;           // +1 prevent 0.5 damage possible lost at 1..4 ticks
                     // 5..8 ticks have normal tick damage
                 }
-                
+
                 // Corruption and Immolate bonus damage from t5 set
                 if(GetSpellProto()->SpellFamilyName==SPELLFAMILY_WARLOCK && (GetSpellProto()->SpellFamilyFlags & 6))
                 {
@@ -6147,7 +6159,7 @@ void Aura::PeriodicTick()
             if(IsPartialyResistable(GetSpellProto()))
             {
                 pCaster->CalcAbsorbResist(m_target, GetSpellSchoolMask(GetSpellProto()), DOT, damageInfo.damage, &damageInfo.absorb, &damageInfo.resist);
-            } 
+            }
             else
             {
                 pCaster->CalcAbsorb(m_target, GetSpellSchoolMask(GetSpellProto()), damageInfo.damage, &damageInfo.absorb, &damageInfo.resist);
@@ -6390,7 +6402,7 @@ void Aura::PeriodicTick()
         {
             // ignore non positive values (can be result apply spellmods to aura damage
             uint32 pdamage = GetModifierValue() > 0 ? GetModifierValue() : 0;
-    
+
             // Alchemist Stone
             if(GetSpellProto()->SpellFamilyName == SPELLFAMILY_POTION)
                 if(Aura *aura = m_target->GetAura(17619, 0))
@@ -6883,7 +6895,7 @@ void Aura::HandleAuraMeleeAPAttackerBonus(bool apply, bool Real)
 {
     if(!Real)
         return;
-    
+
     if(apply)
     {
         // Hunter's Mark
