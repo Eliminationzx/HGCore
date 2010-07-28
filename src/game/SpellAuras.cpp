@@ -2564,82 +2564,12 @@ void Aura::HandleAuraPeriodicDummy(bool apply, bool Real)
                 break;
             }
 
-            // Harpooner's Mark
-            if(spell->Id == 40084)
+            // Harpooner's Mark on apply
+            if(spell->Id == 40084 && apply)
             {
-                CellPair pair(Trinity::ComputeCellPair(m_target->GetPositionX(), m_target->GetPositionY()));
-                Cell cell(pair);
-                cell.data.Part.reserved = ALL_DISTRICT;
-                cell.SetNoCreate();
-
-                std::list<Creature*> TurtleList;
-
-                Trinity::AllCreaturesOfEntryInRange check(m_target, 22885, 80);     //Find and Dragon Turtle in 80yd range
-                Trinity::CreatureListSearcher<Trinity::AllCreaturesOfEntryInRange> searcher(TurtleList, check);
-                TypeContainerVisitor<Trinity::CreatureListSearcher<Trinity::AllCreaturesOfEntryInRange>, GridTypeMapContainer> visitor(searcher);
-
-                cell.Visit(pair, visitor, *(m_target->GetMap()));
-
-                if(apply)     //force any dragon turlte in range to attack victim with mark
-                {
-                    if(!TurtleList.empty())
-                    {
-                        for(std::list<Creature*>::iterator itr = TurtleList.begin(); itr !=TurtleList.end(); ++itr)
-                        {
-                            if(Creature* turtle = *itr)
-                            {
-                                if(turtle->isInCombat())
-                                {
-                                    turtle->ApplySpellImmune(0, IMMUNITY_STATE, SPELL_AURA_MOD_TAUNT, true);
-                                    turtle->ApplySpellImmune(0, IMMUNITY_EFFECT,SPELL_EFFECT_ATTACK_ME, true);
-                                    if(!turtle->getThreatManager().getOnlineContainer().empty())
-                                    {
-                                        if(HostilReference* forcedVictim = turtle->getThreatManager().getOnlineContainer().getReferenceByTarget(m_target))
-                                        {
-                                            if(forcedVictim->getThreat() < 100000)
-                                            {
-                                                turtle->AI()->AttackStart(m_target);
-                                                turtle->getThreatManager().setCurrentVictim(forcedVictim);
-                                                turtle->getThreatManager().addThreat(m_target, 1000000);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                else     // when removing mark, set back threat to normal values
-                {
-                    if(!TurtleList.empty())
-                    {
-                        for(std::list<Creature*>::iterator itr = TurtleList.begin(); itr !=TurtleList.end(); ++itr)
-                        {
-                          if(Creature* turtle = *itr)
-                          {
-                            if(turtle->isInCombat())
-                            {
-                                turtle->ApplySpellImmune(0, IMMUNITY_STATE, SPELL_AURA_MOD_TAUNT, false);
-                                turtle->ApplySpellImmune(0, IMMUNITY_EFFECT,SPELL_EFFECT_ATTACK_ME, false);
-                                if(!turtle->getThreatManager().getOnlineContainer().empty())
-                                {
-                                    if(HostilReference* forcedVictim = turtle->getThreatManager().getOnlineContainer().getReferenceByTarget(m_target))
-                                    {
-                                        if(forcedVictim->getThreat() >= 1000000)
-                                        {
-                                            turtle->getThreatManager().addThreat(m_target, -1000000);
-                                            HostilReference* newTarget = turtle->getThreatManager().getOnlineContainer().getMostHated();
-                                            turtle->getThreatManager().setCurrentVictim(newTarget);
-                                        }
-                                    }
-                                }
-                            }
-                          }
-                        }
-                    }
-                }
+                m_target->CastSpell((Unit*)NULL, 40085, true);
+                break;
             }
-            break;
         }
     }
 
@@ -3943,6 +3873,29 @@ void Aura::HandleModStateImmunityMask(bool apply, bool Real)
 
     //proper flags unknown, uncomment this when verified
     /*
+    miscVal i spelle którym są przypisane + immune wg TC2
+
+     TC2       S F ? d D T ? ? C t R
+    96      -  0 0 0 0 1 1 0 0 0 0 0  - Free Friend - niby disspeluje incapacitate
+    679     -  0 1 0 1 0 1 0 0 1 1 1  - MC
+    817     -  0 1 1 0 0 1 1 0 0 0 1  - Blue Dragon Immunity
+    878     -  0 1 1 0 1 1 0 1 1 1 0  - Whirlwind, Fog of Corruption
+    1557    -  1 1 0 0 0 0 1 0 1 0 1  - Starling Roar - niby disspeluje snare, cc, stun, (mc nie)
+    1615    -  1 1 0 0 1 0 0 1 1 1 1  - Incite Frenzy
+    1676    -  1 1 0 1 0 0 0 1 1 1 1  - Red Riding Hood
+    1694    -  1 1 0 1 0 0 1 1 1 1 0  - Fixated
+
+    R - root
+    t - transform
+    C - confuse
+    T - taunt
+    D - decrese speed
+    d - disarm
+    F - fear
+    S - stun
+    ? - unknown
+
+
     std::list <AuraType> immunity_list;
 
     if (GetMiscValue() & (1<<10))
@@ -3975,52 +3928,61 @@ void Aura::HandleModStateImmunityMask(bool apply, bool Real)
         m_target->ApplySpellImmune(GetId(),IMMUNITY_STATE,*iter, apply);
     }
     */
-    std::list<uint32> IncapacitateMechanics;    //workaround for spell 40081
+    std::list<uint32> immunity;
 
     if(GetMiscValue() & ((1<<5) | (1<<6)))  //workaround for spell 40081
     {
-        IncapacitateMechanics.push_front(MECHANIC_CHARM);
-        IncapacitateMechanics.push_front(MECHANIC_CONFUSED);
-        IncapacitateMechanics.push_front(MECHANIC_FEAR);
-        IncapacitateMechanics.push_front(MECHANIC_ROOT);
-        IncapacitateMechanics.push_front(MECHANIC_PACIFY);
-        IncapacitateMechanics.push_front(MECHANIC_SLEEP);
-        IncapacitateMechanics.push_front(MECHANIC_SNARE);
-        IncapacitateMechanics.push_front(MECHANIC_STUN);
-        IncapacitateMechanics.push_front(MECHANIC_FREEZE);
-        IncapacitateMechanics.push_front(MECHANIC_KNOCKOUT);
-        IncapacitateMechanics.push_front(MECHANIC_POLYMORPH);
-        IncapacitateMechanics.push_front(MECHANIC_BANISH);
-        IncapacitateMechanics.push_front(MECHANIC_HORROR);
+        immunity.push_front(MECHANIC_CHARM);
+        immunity.push_front(MECHANIC_CONFUSED);
+        immunity.push_front(MECHANIC_FEAR);
+        immunity.push_front(MECHANIC_ROOT);
+        immunity.push_front(MECHANIC_PACIFY);
+        immunity.push_front(MECHANIC_SLEEP);
+        immunity.push_front(MECHANIC_SNARE);
+        immunity.push_front(MECHANIC_STUN);
+        immunity.push_front(MECHANIC_FREEZE);
+        immunity.push_front(MECHANIC_KNOCKOUT);
+        immunity.push_front(MECHANIC_POLYMORPH);
+        immunity.push_front(MECHANIC_BANISH);
+        immunity.push_front(MECHANIC_HORROR);
     }
 
-    if(apply && GetId() == 40081)
+    if(GetId() == 40081)
     {
-        uint32 mechanic = IMMUNE_TO_INCAPACITATE_MASK;
-        Unit::AuraMap& Auras = m_target->GetAuras();
-        for(Unit::AuraMap::iterator iter = Auras.begin(), next; iter != Auras.end(); iter = next)
+        if(apply)
         {
-            next = iter;
-            ++next;
-            SpellEntry const *spell = iter->second->GetSpellProto();
-            if (!iter->second->IsPositive() && spell->Id != 40081)
+            uint32 mechanic = IMMUNE_TO_INCAPACITATE_MASK;
+            Unit::AuraMap& Auras = m_target->GetAuras();
+            for(Unit::AuraMap::iterator iter = Auras.begin(), next; iter != Auras.end(); iter = next)
             {
-                //check for mechanic mask
-                if(GetSpellMechanicMask(spell, iter->second->GetEffIndex()) & mechanic)
+                next = iter;
+                ++next;
+                SpellEntry const *spell = iter->second->GetSpellProto();
+                if (!iter->second->IsPositive() && spell->Id != 40081)
                 {
-                    m_target->RemoveAurasDueToSpell(spell->Id);
-                    if(Auras.empty())
-                        break;
-                    else
-                        next = Auras.begin();
+                    //check for mechanic mask
+                    if(GetSpellMechanicMask(spell, iter->second->GetEffIndex()) & mechanic)
+                    {
+                        m_target->RemoveAurasDueToSpell(spell->Id);
+                        if(Auras.empty())
+                            break;
+                        else
+                            next = Auras.begin();
+                    }
                 }
             }
         }
+        //for 40081
+        for (std::list <uint32>::iterator iter = immunity.begin(); iter != immunity.end(); ++iter)
+        {
+            m_target->ApplySpellImmune(GetId(),IMMUNITY_MECHANIC,*iter, apply);
+        }
     }
-    //for 40081
-    for (std::list <uint32>::iterator iter = IncapacitateMechanics.begin(); iter != IncapacitateMechanics.end(); ++iter)
+
+    if(GetMiscValue() == 1694)      //immune to taunt effect and aura
     {
-        m_target->ApplySpellImmune(GetId(),IMMUNITY_MECHANIC,*iter, apply);
+        m_target->ApplySpellImmune(GetId(),IMMUNITY_STATE,SPELL_AURA_MOD_TAUNT, apply);
+        m_target->ApplySpellImmune(GetId(),IMMUNITY_EFFECT,SPELL_EFFECT_ATTACK_ME, apply);
     }
 }
 
@@ -6700,8 +6662,12 @@ void Aura::PeriodicDummyTick()
 //        case 36207: break;
 //        // Simon Game START timer, (DND)
 //        case 39993: break;
-//        // Harpooner's Mark - apply and remove implemented in HandleAuraPeriodicDummy
-//        case 40084: break;
+        // Harpooner's Mark
+        case 40084:
+        {
+            m_target->CastSpell((Unit*)NULL, 40085, true);
+            break;
+        }
 //        // Knockdown Fel Cannon: break; The Aggro Burst
 //        case 40119: break;
 //        // Old Mount Spell
