@@ -101,7 +101,14 @@ WaypointMovementGenerator<Creature>::Initialize(Creature &u)
     i_currentNode = 0;
     if(waypoints && waypoints->size())
     {
-        node = waypoints->front();
+        if (CreatureData const *cdata = objmgr.GetCreatureData(u.GetDBTableGUIDLow()))
+            i_currentNode = cdata->currentwaypoint;
+
+        if (i_currentNode >= waypoints->size() - 1)
+            i_currentNode = 0;
+
+        node = waypoints->at(i_currentNode);
+
         Traveller<Creature> traveller(u);
         InitTraveller(u, *node);
         i_destinationHolder.SetDestination(traveller, node->x, node->y, node->z);
