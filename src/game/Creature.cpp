@@ -228,8 +228,8 @@ void Creature::RemoveCorpse()
     if( getDeathState()!=CORPSE && !m_isDeadByDefault || getDeathState()!=ALIVE && m_isDeadByDefault )
         return;
 
-    m_deathTimer = 0;
     setDeathState(DEAD);
+    m_deathTimer = 0;
     UpdateObjectVisibility();
     loot.clear();
     m_respawnTime = time(NULL) + m_respawnDelay;
@@ -1664,7 +1664,10 @@ void Creature::setDeathState(DeathState s)
             m_formation->FormationReset(true);
 
         if (canFly() && FallGround())
-            return;
+        {
+            sLog.outDebug("Creature %u couldn't fall to ground level.", this->GetDBTableGUIDLow());
+            //return;
+        }
     }
     Unit::setDeathState(s);
 
@@ -1679,9 +1682,12 @@ void Creature::setDeathState(DeathState s)
             if ( LootTemplates_Skinning.HaveLootFor(GetCreatureInfo()->SkinLootId) )
                 SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_SKINNABLE);
 
+        // test
         if (canFly() && FallGround())
-            return;
-
+        {
+            sLog.outDebug("Creature %u couldn't fall to ground level.", this->GetDBTableGUIDLow());
+        //    return;
+        }
         Unit::setDeathState(CORPSE);
     }
     if(s == JUST_ALIVED)
