@@ -145,12 +145,11 @@ struct TRINITY_DLL_DECL mob_aqueous_spawnAI : public ScriptedAI
 
         if(!merging && MergeTimer < diff)
         {
-            if(Unit* Lord = FindCreature(NPC_AQUEOUS_LORD, 80, m_creature))
+            if(Unit* pLord = FindCreature(NPC_AQUEOUS_LORD, 80, m_creature))
             {
-                m_creature->SetUInt64Value(UNIT_FIELD_TARGET, Lord->GetGUID());
-                AddSpellToCast(Lord, SPELL_MERGE);
+                AddSpellToCast(pLord, SPELL_MERGE, false, true);
+                merging = true;
             }
-            merging = true;
         }
         else
             MergeTimer -= diff;
@@ -1813,7 +1812,7 @@ CreatureAI* GetAI_mob_ashtongue_primalist(Creature *_Creature)
 #define SPELL_INSTANT_POISON        41189
 #define SPELL_MIND_NUMBING_POISON   41190
 #define SPELL_STEALTH               34189
-#define SPELE_DUAL_WIELD            29651
+#define SPELL_DUAL_WIELD            29651
 
 struct TRINITY_DLL_DECL mob_ashtongue_stalkerAI : public ScriptedAI
 {
@@ -1823,33 +1822,10 @@ struct TRINITY_DLL_DECL mob_ashtongue_stalkerAI : public ScriptedAI
     uint32 InstantPoison;
     uint32 MindNumbingPoison;
 
-    Unit* TopAggroTarget(bool withMana)
-    {
-        std::list<HostilReference*> m_threatlist = m_creature->getThreatManager().getThreatList();
-        Unit *target = NULL;
-        while(m_threatlist.size() > 0)
-        {
-            target = Unit::GetUnit(*m_creature, (*m_threatlist.begin())->getUnitGuid());
-            if(withMana && target && target->getPowerType() != POWER_MANA)
-            {
-                m_threatlist.erase(m_threatlist.begin());
-                continue;
-            }
-            if(!withMana && target->getPowerType() == POWER_MANA)
-            {
-                m_threatlist.erase(m_threatlist.begin());
-                continue;
-            }
-            if(!target || !target->isAlive() || target->GetTypeId() != TYPEID_PLAYER)
-                m_threatlist.erase(m_threatlist.begin());
-        }
-        return target;
-    }
-
     void Reset()
     {
         DoCast(m_creature, SPELL_STEALTH);
-        DoCast(m_creature, SPELE_DUAL_WIELD);
+        DoCast(m_creature, SPELL_DUAL_WIELD);
         Blind = urand(10000, 20000);
         InstantPoison = urand(5000, 10000);
         MindNumbingPoison = urand(5000, 10000);
@@ -1870,18 +1846,27 @@ struct TRINITY_DLL_DECL mob_ashtongue_stalkerAI : public ScriptedAI
 
         if(InstantPoison < diff)
         {
-            if(TopAggroTarget(false))
-                AddSpellToCast(TopAggroTarget(false), SPELL_INSTANT_POISON);
-            InstantPoison = 10000;
+            if(Unit *pTarget = SelectUnit(SELECT_TARGET_TOPAGGRO, 0, 60.0f, true, POWER_RAGE))
+            {
+                AddSpellToCast(pTarget, SPELL_INSTANT_POISON);
+                InstantPoison = 10000;
+            }
+            else if(Unit *pTarget = SelectUnit(SELECT_TARGET_TOPAGGRO, 0, 60.0f, true, POWER_ENERGY))
+            {
+                AddSpellToCast(pTarget, SPELL_INSTANT_POISON);
+                InstantPoison = 10000;
+            }
         }
         else
             InstantPoison -= diff;
 
         if(MindNumbingPoison < diff)
         {
-            if(TopAggroTarget(true))
-                AddSpellToCast(TopAggroTarget(true), SPELL_MIND_NUMBING_POISON);
-            MindNumbingPoison = 10000;
+            if(Unit *pTarget = SelectUnit(SELECT_TARGET_RANDOM, 0, 60.0f, true, POWER_MANA))
+            {
+                AddSpellToCast(pTarget, SPELL_MIND_NUMBING_POISON);
+                MindNumbingPoison = 10000;
+            }
         }
         else
             MindNumbingPoison -= diff;
@@ -1924,18 +1909,7 @@ struct TRINITY_DLL_DECL mob_ashtongue_stormcallerAI : public ScriptedAI
         DoZoneInCombat();
         DoCast(m_creature, SPELL_LIGHTNING_SHIELD);
     }
-    Unit* TopAggroTarget(float minDist)
-    {
-        std::list<HostilReference*> m_threatlist = m_creature->getThreatManager().getThreatList();
-        Unit *target = NULL;
-        while(m_threatlist.size() > 0)
-        {
-            target = Unit::GetUnit(*m_creature, (*m_threatlist.begin())->getUnitGuid());
-            if(!target || !target->isAlive() || target->GetTypeId() != TYPEID_PLAYER || (minDist && m_creature->IsWithinCombatRange(target, minDist)))
-                m_threatlist.erase(m_threatlist.begin());
-        }
-        return target;
-    }
+
     void UpdateAI(const uint32 diff)
     {
         if(!UpdateVictim())
@@ -1951,9 +1925,11 @@ struct TRINITY_DLL_DECL mob_ashtongue_stormcallerAI : public ScriptedAI
 
         if(LightningBolt < diff)
         {
-            if(TopAggroTarget(8.0f))
-                DoCast(TopAggroTarget(8.0f), SPELL_LIGHTNING_BOLT);
-            LightningBolt = 5000;
+            if(Unit *pTarget = SelectUnit(SELECT_TARGET_TOPAGGRO, 0, 60.0f, true, 0, 8.0f))
+            {
+                DoCast(pTarget, SPELL_LIGHTNING_BOLT);
+                LightningBolt = 5000;
+            }
         }
         else
             LightningBolt -= diff;

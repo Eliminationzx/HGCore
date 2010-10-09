@@ -138,6 +138,15 @@ void WorldSession::HandleMessagechatOpcode( WorldPacket & recv_data )
             GetPlayer()->UpdateSpeakTime();
     }
 
+    if (type == CHAT_MSG_WHISPER || type == CHAT_MSG_YELL || CHAT_MSG_CHANNEL)
+    {
+        if (GetPlayer()->getLevel() < 5)
+        {
+            SendNotification("You can't send message of this type until you reach level 5.");
+            return;
+        }
+    }
+
     switch(type)
     {
         case CHAT_MSG_SAY:
@@ -160,6 +169,9 @@ void WorldSession::HandleMessagechatOpcode( WorldPacket & recv_data )
             if(msg.empty())
                 break;
 
+            if (ChatHandler(this).ContainsNotAllowedSigns(msg))
+                return;
+
             if(type == CHAT_MSG_SAY)
                 GetPlayer()->Say(msg, lang);
             else if(type == CHAT_MSG_EMOTE)
@@ -181,6 +193,9 @@ void WorldSession::HandleMessagechatOpcode( WorldPacket & recv_data )
 
             if(msg.empty())
                 break;
+
+            if (ChatHandler(this).ContainsNotAllowedSigns(msg))
+                return;
 
             if(!normalizePlayerName(to))
             {
@@ -235,6 +250,9 @@ void WorldSession::HandleMessagechatOpcode( WorldPacket & recv_data )
             if(msg.empty())
                 break;
 
+            if (ChatHandler(this).ContainsNotAllowedSigns(msg))
+                return;
+
             Group *group = GetPlayer()->GetGroup();
             if(!group)
                 return;
@@ -261,6 +279,9 @@ void WorldSession::HandleMessagechatOpcode( WorldPacket & recv_data )
 
             if(msg.empty())
                 break;
+
+            if (ChatHandler(this).ContainsNotAllowedSigns(msg))
+                return;
 
             if (GetPlayer()->GetGuildId())
             {
@@ -289,6 +310,10 @@ void WorldSession::HandleMessagechatOpcode( WorldPacket & recv_data )
             if(msg.empty())
                 break;
 
+            if (ChatHandler(this).ContainsNotAllowedSigns(msg))
+                return;
+
+
             if (GetPlayer()->GetGuildId())
             {
                 Guild *guild = objmgr.GetGuildById(GetPlayer()->GetGuildId());
@@ -315,6 +340,9 @@ void WorldSession::HandleMessagechatOpcode( WorldPacket & recv_data )
             if(msg.empty())
                 break;
 
+            if (ChatHandler(this).ContainsNotAllowedSigns(msg))
+                return;
+
             Group *group = GetPlayer()->GetGroup();
             if(!group || !group->isRaidGroup() || group->isBGGroup())
                 return;
@@ -340,6 +368,9 @@ void WorldSession::HandleMessagechatOpcode( WorldPacket & recv_data )
 
             if(msg.empty())
                 break;
+
+            if (ChatHandler(this).ContainsNotAllowedSigns(msg))
+                return;
 
             Group *group = GetPlayer()->GetGroup();
             if(!group || !group->isRaidGroup() || !group->IsLeader(GetPlayer()->GetGUID()) || group->isBGGroup())
@@ -428,6 +459,9 @@ void WorldSession::HandleMessagechatOpcode( WorldPacket & recv_data )
 
             if(msg.empty())
                 break;
+
+            if (ChatHandler(this).ContainsNotAllowedSigns(msg))
+                return;
 
             if(ChannelMgr* cMgr = channelMgr(_player->GetTeam()))
             {
