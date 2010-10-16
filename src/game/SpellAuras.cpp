@@ -566,10 +566,10 @@ void Aura::Update(uint32 diff)
         }
     }
 
-    // Scalding Water
-    if(GetId() == 37284)
+    // Scalding Water remove, while not in water ;]
+    if (GetId() == 37284)
     {
-        if(!m_target->IsInWater())
+        if (m_target->GetPositionZ() >= -19.9645)
             m_target->RemoveAurasDueToSpell(37284);
     }
 
@@ -1739,8 +1739,8 @@ void Aura::TriggerSpell()
 //                    case 37125: break;
 //                    // Arcane Flurry
 //                    case 37268: break;
-//                    // Spout
-//                    case 37429: break;
+                    // Spout
+                    case 37429: trigger_spell_id = 42835; break;
 //                    // Spout
 //                    case 37430: break;
 //                    // Karazhan - Chess NPC AI, Snapshot timer
@@ -1784,7 +1784,7 @@ void Aura::TriggerSpell()
 //                    case 38751: break;
 //                    // Murmur's Touch
 //                    case 38794: break;
-//                    // Activate Nether-wraith Beacon (31742 Nether-wraith Beacon item)
+                    // Activate Nether-wraith Beacon (31742 Nether-wraith Beacon item)
                     case 39105:
                     {
                         if(!target)

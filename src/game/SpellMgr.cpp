@@ -2729,6 +2729,19 @@ void SpellMgr::LoadSpellCustomAttr()
         case 66:    // Invisibility (fading) - break on casting spell
             spellInfo->AuraInterruptFlags |= AURA_INTERRUPT_FLAG_CAST;
             break;
+        case 37363: // set 5y radius instead of 25y
+            spellInfo->EffectRadiusIndex[0] = 8;
+            spellInfo->EffectRadiusIndex[0] = 8;
+            break;
+        case 37433: // just in case, where u don't get spout sometimes ?
+            spellInfo->EffectImplicitTargetA[0] = TARGET_UNIT_TARGET_ENEMY;
+            spellInfo->EffectImplicitTargetA[1] = TARGET_UNIT_TARGET_ENEMY;
+            spellInfo->EffectImplicitTargetB[0] = 0;
+            spellInfo->EffectImplicitTargetB[1] = 0;
+            break;
+        case 42835: // set visual only
+            spellInfo->Effect[0] = 0;
+            break;
         default:
             break;
         }
@@ -3114,6 +3127,13 @@ DiminishingGroup GetDiminishingReturnsGroupForSpell(SpellEntry const* spellproto
             // Hamstring - limit duration to 10s in PvP
             if (spellproto->SpellFamilyFlags & 0x00000000002LL)
                 return DIMINISHING_LIMITONLY;
+            break;
+        }
+        case SPELLFAMILY_PALADIN:
+        {
+            // Turn Evil - share group with fear, seduction
+            if (spellproto->Id == 10326)
+                return DIMINISHING_FEAR;
             break;
         }
         default:
