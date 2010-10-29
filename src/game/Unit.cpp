@@ -769,7 +769,7 @@ void Unit::SendDamageLog(DamageLog *damageInfo)
     }
 }
 
-// tymczasowo to kopia starej funkcji - trzeba zmienia
+// tymczasowo to kopia starej funkcji - trzeba zmienic
 uint32 Unit::DealDamage(DamageLog *damageInfo, DamageEffectType damagetype, const SpellEntry *spellProto, bool durabilityLoss)
 {
     Unit *pVictim = damageInfo->target;
@@ -1360,7 +1360,7 @@ void Unit::CalculateSpellDamageTaken(SpellDamageLog *damageInfo, int32 damage, S
                 if (pVictim->GetTypeId()==TYPEID_PLAYER)
                     damage -= ((Player*)pVictim)->GetMeleeCritDamageReduction(damage);
 
-                // je?eli crit to zmieniamy
+                // jezeli crit to zmieniamy
                 damageInfo->rageDamage = damage;
             }
             // Spell weapon based damage CAN BE crit & blocked at same time
@@ -7266,13 +7266,13 @@ Unit *Unit::GetOwner() const
     uint64 ownerid = GetOwnerGUID();
     if(!ownerid)
         return NULL;
-    return ObjectAccessor::GetUnit(*this, ownerid);
+    return GetMap()->GetUnit(ownerid);
 }
 
 Unit *Unit::GetCharmer() const
 {
     if(uint64 charmerid = GetCharmerGUID())
-        return ObjectAccessor::GetUnit(*this, charmerid);
+        return GetMap()->GetUnit(charmerid);
     return NULL;
 }
 
@@ -7280,7 +7280,7 @@ Player* Unit::GetCharmerOrOwnerPlayerOrPlayerItself() const
 {
     uint64 guid = GetCharmerOrOwnerGUID();
     if(IS_PLAYER_GUID(guid))
-        return ObjectAccessor::GetPlayer(*this, guid);
+        return ObjectAccessor::GetPlayer(guid);
 
     return GetTypeId()==TYPEID_PLAYER ? (Player*)this : NULL;
 }
@@ -7303,7 +7303,7 @@ Unit* Unit::GetCharm() const
 {
     if(uint64 charm_guid = GetCharmGUID())
     {
-        if(Unit* pet = ObjectAccessor::GetUnit(*this, charm_guid))
+        if(Unit* pet = Unit::GetUnit(*this, charm_guid))
             return pet;
 
         sLog.outError("Unit::GetCharm: Charmed creature %u not exist.",GUID_LOPART(charm_guid));
@@ -9741,7 +9741,17 @@ void Unit::ApplyDiminishingAura( DiminishingGroup group, bool apply )
 
 Unit* Unit::GetUnit(WorldObject& object, uint64 guid)
 {
-    return ObjectAccessor::GetUnit(object,guid);
+    return object.GetMap()->GetUnit(guid);
+}
+
+Unit* Unit::GetUnit(const Unit& unit, uint64 guid)
+{
+    return unit.GetMap()->GetUnit(guid);
+}
+
+Unit* Unit::GetUnit(uint64 guid)
+{
+    return GetMap()->GetUnit(guid);
 }
 
 Player* Unit::GetPlayer(uint64 guid)
@@ -9752,6 +9762,11 @@ Player* Unit::GetPlayer(uint64 guid)
 Creature* Unit::GetCreature(WorldObject& object, uint64 guid)
 {
     return object.GetMap()->GetCreature(guid);
+}
+
+Creature* Unit::GetCreature(uint64 guid)
+{
+    return GetMap()->GetCreature(guid);
 }
 
 bool Unit::isVisibleForInState( Player const* u, bool inVisibleList ) const
@@ -11945,7 +11960,7 @@ void Unit::SetFeared(bool apply)
         Unit *caster = NULL;
         Unit::AuraList const& fearAuras = GetAurasByType(SPELL_AURA_MOD_FEAR);
         if(!fearAuras.empty())
-            caster = ObjectAccessor::GetUnit(*this, fearAuras.front()->GetCasterGUID());
+            caster = GetMap()->GetUnit(fearAuras.front()->GetCasterGUID());
         if(!caster)
             caster = getAttackerForHelper();
 

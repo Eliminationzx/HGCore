@@ -18544,7 +18544,7 @@ void Player::InitPrimaryProffesions()
 
 void Player::SendComboPoints()
 {
-    Unit *combotarget = ObjectAccessor::GetUnit(*this, m_comboTarget);
+    Unit *combotarget = GetMap()->GetUnit(m_comboTarget);
     if (combotarget)
     {
         WorldPacket data(SMSG_UPDATE_COMBO_POINTS, combotarget->GetPackGUID().size()+1);
@@ -18569,7 +18569,7 @@ void Player::AddComboPoints(Unit* target, int8 count)
     else
     {
         if(m_comboTarget)
-            if(Unit* target = ObjectAccessor::GetUnit(*this,m_comboTarget))
+            if(Unit* target = GetMap()->GetUnit(m_comboTarget))
                 target->RemoveComboPointHolder(GetGUIDLow());
 
         m_comboTarget = target->GetGUID();
@@ -18594,7 +18594,7 @@ void Player::ClearComboPoints()
 
     m_comboPoints = 0;
 
-    Unit* target = ObjectAccessor::GetUnit(*this,m_comboTarget);
+    Unit* target = GetMap()->GetUnit(m_comboTarget);
 
     if(m_finishingComboPoints && target) {
         AddComboPoints(target, m_finishingComboPoints);
@@ -19142,7 +19142,7 @@ void Player::UpdateForQuestsGO()
     {
         if(IS_GAMEOBJECT_GUID(*itr))
         {
-            GameObject *obj = HashMapHolder<GameObject>::Find(*itr);
+            GameObject *obj = GetMap()->GetGameObject(*itr);
             if(obj)
                 obj->BuildValuesUpdateBlockForPlayer(&udata,this);
         }
@@ -19879,7 +19879,7 @@ WorldObject* Player::GetFarsightTarget() const
 {
     // Players can have in farsight field another player's guid, a creature's guid, or a dynamic object's guid
     if (uint64 guid = GetUInt64Value(PLAYER_FARSIGHT))
-        return (WorldObject*)ObjectAccessor::GetObjectByTypeMask(*this, guid, TYPEMASK_PLAYER | TYPEMASK_UNIT | TYPEMASK_DYNAMICOBJECT);
+        return (WorldObject*)GetMap()->GetObjectByTypeMask(*this, guid, TYPEMASK_PLAYER | TYPEMASK_UNIT | TYPEMASK_DYNAMICOBJECT);
     return NULL;
 }
 
