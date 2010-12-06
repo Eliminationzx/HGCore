@@ -265,6 +265,8 @@ struct TRINITY_DLL_DECL advisorbase_ai : public ScriptedAI
         if(Unit* target = SelectUnit(SELECT_TARGET_RANDOM, 0, 200, true))
             AttackStart(target);
         CanDie = true;
+        if (me->GetEntry() == 20062)    //capernian
+            ((ScriptedAI*)(me->AI()))->StartAutocast();
     }
 
     void UpdateMaxHealth(bool twice)
@@ -817,7 +819,7 @@ struct TRINITY_DLL_DECL boss_kaelthasAI : public ScriptedAI
                             {
                                 Advisor->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
                                 Advisor->setFaction(m_creature->getFaction());
-
+                                ((ScriptedAI*)(Advisor->AI()))->StartAutocast();
                                 target = SelectUnit(SELECT_TARGET_RANDOM, 0);
                                 if(target)
                                     Advisor->AI()->AttackStart(target);
@@ -1512,11 +1514,14 @@ struct TRINITY_DLL_DECL boss_grand_astromancer_capernianAI : public advisorbase_
         Yell = false;
         Check_Timer = 3000;
 
+        SetAutocast(SPELL_CAPERNIAN_FIREBALL, 2500);
+
         advisorbase_ai::Reset();
     }
 
     void JustDied(Unit* pKiller)
     {
+        StopAutocast();
         DoScriptText(SAY_CAPERNIAN_DEATH, m_creature);
     }
 
@@ -1524,6 +1529,8 @@ struct TRINITY_DLL_DECL boss_grand_astromancer_capernianAI : public advisorbase_
     {
         if (who || m_creature->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE))
             return;
+
+        StartAutocast();
 
         DoScriptText(SAY_CAPERNIAN_AGGRO, m_creature);
     }
@@ -1539,13 +1546,13 @@ struct TRINITY_DLL_DECL boss_grand_astromancer_capernianAI : public advisorbase_
             return;
 
         //cast from 30yd distance
-        if(m_creature->GetDistance2d(m_creature->getVictim()) < CAPERNIAN_DISTANCE)
-                m_creature->StopMoving();
+        if (m_creature->GetDistance2d(m_creature->getVictim()) < CAPERNIAN_DISTANCE)
+            m_creature->StopMoving();
 
-        if(Creature* kael = Unit::GetCreature((*m_creature), pInstance->GetData64(DATA_KAELTHAS)))
+        if (Creature* kael = Unit::GetCreature((*m_creature), pInstance->GetData64(DATA_KAELTHAS)))
         {
             //Check_Timer
-            if(Check_Timer < diff)
+            if (Check_Timer < diff)
             {
                 DoZoneInCombat();
                 Check_Timer = 3000;
@@ -1555,26 +1562,16 @@ struct TRINITY_DLL_DECL boss_grand_astromancer_capernianAI : public advisorbase_
         }
 
         //Yell_Timer
-        if(!Yell)
+        if (!Yell)
         {
-            if(Yell_Timer < diff)
+            if (Yell_Timer < diff)
             {
                 DoScriptText(SAY_CAPERNIAN_AGGRO, m_creature);
-
                 Yell = true;
-            }else Yell_Timer -= diff;
+            }
+            else
+                Yell_Timer -= diff;
         }
-
-        //Fireball_Timer
-        if(Fireball_Timer < diff)
-        {
-            if(!m_creature->IsNonMeleeSpellCasted(false) && m_creature->GetDistance2d(m_creature->getVictim()) < 35.0f)
-                DoCast(m_creature->getVictim(), SPELL_CAPERNIAN_FIREBALL);
-
-            Fireball_Timer = 2000+diff;   // spam fireball casts if ready
-        }
-        else
-            Fireball_Timer -= diff;
 
         //Conflagration_Timer
         if(Conflagration_Timer < diff)
@@ -1601,7 +1598,7 @@ struct TRINITY_DLL_DECL boss_grand_astromancer_capernianAI : public advisorbase_
             {
                 Unit* pUnit = Unit::GetUnit((*m_creature), (*i)->getUnitGuid());
                                                             //if in melee range
-                if(pUnit && pUnit->IsWithinDistInMap(m_creature, 5))
+                if(pUnit && pUnit->IsWithinDistInMap(m_creature, 5) && pUnit->GetTypeId() == TYPEID_PLAYER && !pUnit->IsImmunedToDamage(SPELL_SCHOOL_MASK_ARCANE))
                 {
                     InMeleeRange = true;
                     break;
@@ -1610,7 +1607,6 @@ struct TRINITY_DLL_DECL boss_grand_astromancer_capernianAI : public advisorbase_
 
             if(InMeleeRange)
                 ForceAOESpellCast(SPELL_ARCANE_EXPLOSION);
-                //DoCastAOE(SPELL_ARCANE_EXPLOSION);
 
             ArcaneExplosion_Timer = 2000+rand()%2000;
         }
