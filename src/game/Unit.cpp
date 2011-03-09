@@ -7226,6 +7226,9 @@ bool Unit::Attack(Unit *victim, bool meleeAttack)
     if (!victim || victim == this)
         return false;
 
+    if (GetTypeId() == TYPEID_UNIT && ((Creature*)this)->GetCreatureInfo()->flags_extra & CREATURE_FLAG_EXTRA_NO_TARGET)
+        return false;
+
     // dead units can neither attack nor be attacked
     if (!isAlive() || !victim->IsInWorld() || !victim->isAlive())
         return false;
@@ -10542,6 +10545,7 @@ void Unit::UpdateCharmAI()
         if (isCharmed())
         {
             i_disabledAI = i_AI;
+
             if (isPossessed())
                 i_AI = new PossessedAI((Creature*)this);
             else

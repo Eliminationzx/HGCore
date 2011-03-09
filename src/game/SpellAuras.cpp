@@ -2404,6 +2404,14 @@ void Aura::HandleAuraDummy(bool apply, bool Real)
     // AT REMOVE
     else
     {
+        // Control Piece - Chess Event
+        if(GetId() == 30019)
+        {
+            Unit *charm = caster->GetCharm();
+            if(charm)
+                charm->RemoveAurasDueToSpell(30019,0);  // Also remove aura from charmed creature, not only from us :]
+        }
+
         if (m_target->GetTypeId() == TYPEID_PLAYER && GetSpellProto()->Effect[0]==72)
         {
             // spells with SpellEffect=72 and aura=4: 6196, 6197, 21171, 21425
@@ -2667,7 +2675,7 @@ void Aura::HandleAuraDummy(bool apply, bool Real)
                 // aura animate dead (fainted) state for the duration, but we need to animate the death itself (correct way below?)
                 if (Unit* pCaster = GetCaster())
                     pCaster->ApplyModFlag(UNIT_FIELD_FLAGS_2, UNIT_FLAG2_FEIGN_DEATH, apply);
-                
+
                 // Beam to Zelfrax at remove
                 if (!apply)
                     m_target->CastSpell(m_target, 42517, true);
@@ -3912,7 +3920,7 @@ void Aura::HandleInvisibility(bool apply, bool Real)
         {
             // apply glow vision
             m_target->SetFlag(PLAYER_FIELD_BYTES2,PLAYER_FIELD_BYTE2_INVISIBILITY_GLOW);
-            
+
             // remove player from the objective's active player count at invisibility
             /*
             if (OutdoorPvP * pvp = ((Player*)m_target)->GetOutdoorPvP())
@@ -3951,7 +3959,7 @@ void Aura::HandleInvisibility(bool apply, bool Real)
                 if (!m_target->HasAuraType(SPELL_AURA_MOD_STEALTH))
                 {
                     m_target->SetVisibility(VISIBILITY_ON);
-                    
+
                     /*
                     if (m_target->GetTypeId() == TYPEID_PLAYER)
                         if (OutdoorPvP * pvp = ((Player*)m_target)->GetOutdoorPvP())

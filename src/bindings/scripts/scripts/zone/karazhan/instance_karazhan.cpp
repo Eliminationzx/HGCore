@@ -65,7 +65,7 @@ void instance_karazhan::Initialize()
 
 bool instance_karazhan::IsEncounterInProgress() const
 {
-    for (uint8 i = 0; i < ENCOUNTERS; ++i)
+    for (uint8 i = 0; i < ENCOUNTERS - 3; ++i)
         if (Encounters[i] != DONE && Encounters[i] != NOT_STARTED)
             return true;
 
@@ -88,6 +88,9 @@ uint32 instance_karazhan::GetData(uint32 identifier)
         case DATA_CHESS_EVENT:            return Encounters[9];
         case DATA_MALCHEZZAR_EVENT:       return Encounters[10];
         case DATA_NIGHTBANE_EVENT:        return Encounters[11];
+        case DATA_DUST_COVERED_CHEST:     return Encounters[12];
+        case CHESS_EVENT_TEAM:            return Encounters[13];
+        case DATA_CHESS_DAMAGE:           return Encounters[14];
         case DATA_OPERA_PERFORMANCE:      return OperaEvent;
         case DATA_OPERA_OZ_DEATHCOUNT:    return OzDeathCount;
         case DATA_IMAGE_OF_MEDIVH:        return ImageGUID;
@@ -184,6 +187,7 @@ uint64 instance_karazhan::GetData64(uint32 data)
         case DATA_ARAN:                         return AranGUID;
         case DATA_BLIZZARD:                     return BlizzardGUID;
         case DATA_BARNES:                       return BarnesGUID;
+        case DATA_CHESS_ECHO_OF_MEDIVH:         return MedivhGUID;
     }
 
     return 0;
@@ -193,71 +197,98 @@ void instance_karazhan::SetData(uint32 type, uint32 data)
 {
     switch (type)
     {
-    case DATA_ATTUMEN_EVENT:
-        if(Encounters[0] != DONE)
-            Encounters[0] = data;
-        break;
-    case DATA_MOROES_EVENT:
-        if(Encounters[1] != DONE)
-            Encounters[1] = data;
-        break;
-    case DATA_MAIDENOFVIRTUE_EVENT:
-        if(Encounters[2] != DONE)
-            Encounters[2] = data;
-        break;
-    case DATA_OPTIONAL_BOSS_EVENT:
-        if(Encounters[3] != DONE)
-            Encounters[3] = data;
-        break;
-    case DATA_OPERA_EVENT:
-        if (Encounters[4] == SPECIAL && data == DONE)
-            data = NOT_STARTED;
+        case DATA_ATTUMEN_EVENT:
+            if (Encounters[0] != DONE)
+                Encounters[0] = data;
+            break;
+        case DATA_MOROES_EVENT:
+            if (Encounters[1] != DONE)
+                Encounters[1] = data;
+            break;
+        case DATA_MAIDENOFVIRTUE_EVENT:
+            if (Encounters[2] != DONE)
+                Encounters[2] = data;
+            break;
+        case DATA_OPTIONAL_BOSS_EVENT:
+            if (Encounters[3] != DONE)
+                Encounters[3] = data;
+            break;
+        case DATA_OPERA_EVENT:
+            if (Encounters[4] == SPECIAL && data == DONE)
+                data = NOT_STARTED;
 
-        if (data == DONE)
-        {
-            HandleGameObject(SideEntranceDoor, true);
-            HandleGameObject(ServentAccessDoor, true);
-            HandleGameObject(StageDoorLeftGUID, true);
-            HandleGameObject(StageDoorRightGUID, true);
-        }
+            if (data == DONE)
+            {
+                HandleGameObject(SideEntranceDoor, true);
+                HandleGameObject(ServentAccessDoor, true);
+                HandleGameObject(StageDoorLeftGUID, true);
+                HandleGameObject(StageDoorRightGUID, true);
+            }
 
-        if (Encounters[4] != DONE)
-            Encounters[4] = data;
+            if (Encounters[4] != DONE)
+                Encounters[4] = data;
 
-        if (data == NOT_STARTED)
-            OzDeathCount = 0;
-        break;
-    case DATA_CURATOR_EVENT:
-        if(Encounters[5] != DONE)
-            Encounters[5] = data;
-        break;
-    case DATA_SHADEOFARAN_EVENT:
-        if(Encounters[6] != DONE)
-            Encounters[6] = data;
-        break;
-    case DATA_TERESTIAN_EVENT:
-        if(Encounters[7] != DONE)
-            Encounters[7] = data;
-        break;
-    case DATA_NETHERSPITE_EVENT:
-        if(Encounters[8] != DONE)
-            Encounters[8] = data;
-        break;
-    case DATA_CHESS_EVENT:
-        if(Encounters[9] != DONE)
+            if (data == NOT_STARTED)
+                OzDeathCount = 0;
+            break;
+        case DATA_CURATOR_EVENT:
+            if (Encounters[5] != DONE)
+                Encounters[5] = data;
+
+            if (data == DONE)
+                HandleGameObject(GamesmansDoor, true);
+            break;
+        case DATA_SHADEOFARAN_EVENT:
+            if (Encounters[6] != DONE)
+                Encounters[6] = data;
+            break;
+        case DATA_TERESTIAN_EVENT:
+            if (Encounters[7] != DONE)
+                Encounters[7] = data;
+            break;
+        case DATA_NETHERSPITE_EVENT:
+            if (Encounters[8] != DONE)
+                Encounters[8] = data;
+            break;
+        case DATA_CHESS_EVENT:
+            if(data == DONE)
+            {
+                if (GetData(DATA_DUST_COVERED_CHEST) != SPECIAL)
+                    SetData(DATA_DUST_COVERED_CHEST, DONE);
+            }
+            else
+            {
+                if (data == FAIL)
+                    SetData(DATA_DUST_COVERED_CHEST, SPECIAL);
+            }
+
+
             Encounters[9] = data;
-        break;
-    case DATA_MALCHEZZAR_EVENT:
-        if(Encounters[10] != DONE)
-            Encounters[10] = data;
-        break;
-    case DATA_NIGHTBANE_EVENT:
-        if(Encounters[11] != DONE)
-            Encounters[11] = data;
-        break;
-    case DATA_OPERA_OZ_DEATHCOUNT:
-        ++OzDeathCount;
-        break;
+            break;
+        case CHESS_EVENT_TEAM:
+            Encounters[13] = data;
+            break;
+        case DATA_CHESS_DAMAGE:
+            Encounters[14] = data;
+            break;
+        case DATA_DUST_COVERED_CHEST:
+            if (Encounters[12] != DONE)
+                Encounters[12] = data;
+
+            if (data == DONE)
+                HandleGameObject(GamesmansExitDoor, true);
+            break;
+        case DATA_MALCHEZZAR_EVENT:
+            if (Encounters[10] != DONE)
+                Encounters[10] = data;
+            break;
+        case DATA_NIGHTBANE_EVENT:
+            if (Encounters[11] != DONE)
+                Encounters[11] = data;
+            break;
+        case DATA_OPERA_OZ_DEATHCOUNT:
+            ++OzDeathCount;
+            break;
     }
 
     if(data == DONE)
@@ -286,17 +317,17 @@ void instance_karazhan::OnObjectCreate(GameObject* go)
     case 183932:
         CurtainGUID           = go->GetGUID();
         if(Encounters[4] == DONE)
-            HandleGameObject(NULL,true,go);
+            HandleGameObject(NULL, true, go);
         break;
     case 184278:
         StageDoorLeftGUID     = go->GetGUID();
         if(Encounters[4] == DONE)
-            HandleGameObject(NULL,true,go);
+            HandleGameObject(NULL, true, go);
         break;
     case 184279:
         StageDoorRightGUID    = go->GetGUID();
         if(Encounters[4] == DONE)
-            HandleGameObject(NULL,true,go);
+            HandleGameObject(NULL, true, go);
         break;
     case 184517:
         LibraryDoor           = go->GetGUID();
@@ -308,9 +339,13 @@ void instance_karazhan::OnObjectCreate(GameObject* go)
         break;
     case 184276:
         GamesmansDoor         = go->GetGUID();
+        if(Encounters[5] == DONE)
+            HandleGameObject(NULL, true, go);
         break;
     case 184277:
         GamesmansExitDoor     = go->GetGUID();
+        //if(Encounters[12] == DONE)
+            HandleGameObject(NULL, true, go);
         break;
     case 185134:
         NetherspaceDoor       = go->GetGUID();
@@ -324,12 +359,12 @@ void instance_karazhan::OnObjectCreate(GameObject* go)
     case 184275:
         SideEntranceDoor      = go->GetGUID();
         if(Encounters[4] == DONE)
-            HandleGameObject(NULL,true,go);
+            HandleGameObject(NULL, true, go);
         break;
     case 184281:
         ServentAccessDoor = go->GetGUID();
         if(Encounters[4] == DONE)
-            HandleGameObject(NULL,true,go);
+            HandleGameObject(NULL, true, go);
         break;
     }
 
@@ -361,7 +396,8 @@ std::string instance_karazhan::GetSaveData()
     stream << Encounters[8] << " ";
     stream << Encounters[9]  << " ";
     stream << Encounters[10] << " ";
-    stream << Encounters[11];
+    stream << Encounters[11] << " ";
+    stream << Encounters[12];
 
     OUT_SAVE_INST_DATA_COMPLETE;
 
@@ -378,12 +414,25 @@ void instance_karazhan::Load(const char* in)
 
     OUT_LOAD_INST_DATA(in);
     std::istringstream stream(in);
-    stream >> Encounters[0] >> Encounters[1] >> Encounters[2] >> Encounters[3]
-        >> Encounters[4] >> Encounters[5] >> Encounters[6] >> Encounters[7]
-        >> Encounters[8] >> Encounters[9] >> Encounters[10] >> Encounters[11];
-    for(uint8 i = 0; i < ENCOUNTERS; ++i)
-        if(Encounters[i] == IN_PROGRESS)                // Do not load an encounter as "In Progress" - reset it instead.
+
+    stream  >> Encounters[0]
+            >> Encounters[1]
+            >> Encounters[2]
+            >> Encounters[3]
+            >> Encounters[4]
+            >> Encounters[5]
+            >> Encounters[6]
+            >> Encounters[7]
+            >> Encounters[8]
+            >> Encounters[9]
+            >> Encounters[10]
+            >> Encounters[11]
+            >> Encounters[12];
+
+    for (uint8 i = 0; i < ENCOUNTERS; ++i)
+        if (Encounters[i] == IN_PROGRESS)                // Do not load an encounter as "In Progress" - reset it instead.
             Encounters[i] = NOT_STARTED;
+
     OUT_LOAD_INST_DATA_COMPLETE;
 }
 
@@ -416,7 +465,6 @@ void instance_karazhan::Update(uint32 diff)
             CheckTimer -= diff;
     }
 }
-
 
 InstanceData* GetInstanceData_instance_karazhan(Map* map)
 {
