@@ -27,11 +27,10 @@ EndScriptData */
 /************* Quotes and Sounds ***********************/
 // Gossip for when a player clicks Akama
 #define GOSSIP_ITEM           "We are ready to face Illidan"
+#define GOSSIP_ITEM1          "We are not ready to face Illidan yet. "
 
 // Yells for/by Akama
 #define SAY_AKAMA_BEWARE      -1999988
-#define SAY_AKAMA_LEAVE       -1999990
-
 
 // I think I'll fly now and let my subordinates take you on
 #define SAY_SUMMONFLAMES      -1999994
@@ -43,24 +42,14 @@ EndScriptData */
 // I KILL!
 #define SAY_ENRAGE            -1999997
 
-/************** Spells *************/
-// Normal Form
-#define SPELL_PARASITIC_SHADOWFIEND     41917 // DoT of 3k Shadow every 2 seconds. Lasts 10 seconds. (Script effect: Summon 2 parasites once the debuff has ticked off)
-#define SPELL_PARASITIC_SHADOWFIEND2    41914 // Used by Parasitic
-#define SPELL_SUMMON_PARASITICS         41915 // Summons 2 Parasitic Shadowfiends on the target. It's supposed to be cast as soon as the Parasitic Shadowfiend debuff is gone, but the spells aren't linked :(
-#define SPELL_AGONIZING_FLAMES          40932 // 4k fire damage initial to target and anyone w/i 5 yards. PHASE 3 ONLY
 #define SPELL_ENRAGE                    40683 // Increases damage by 50% and attack speed by 30%. 20 seconds, PHASE 5 ONLY
 
 #define SPELL_SHADOW_PRISON             40647 // Illidan casts this spell to immobilize entire raid when he summons Maiev.
 #define SPELL_DEATH                     41220 // This spell doesn't do anything except stun Illidan and set him on his knees.
 #define SPELL_BERSERK                   45078 // Damage increased by 500%, attack speed by 150%
 
-//Phase Normal spells
-#define SPELL_SUMMON_SHADOWDEMON        41117 // Summon four shadowfiends
 #define SPELL_SHADOWFIEND_PASSIVE       41913 // Passive aura for shadowfiends
 
-//Phase Flight spells
-#define SPELL_AZZINOTH_CHANNEL          39857 // Glaives cast it on Flames. Not sure if this is the right spell.
 #define SPELL_BLAZE_EFFECT              40610 // Green flame on the ground, triggers damage (5k) every few seconds
 #define SPELL_BLAZE_SUMMON              40637 // Summons the Blaze creature
 #define SPELL_FLAME_BLAST               40631 // Flames of Azzinoth use this. Frontal cone AoE 7k-9k damage.
@@ -73,9 +62,6 @@ EndScriptData */
 #define CENTER_Z            353.192
 
 #define SPELL_CAGED                     40695 // Caged Trap triggers will cast this on Illidan if he is within 3 yards
-
-#define FLAME_ENRAGE_DISTANCE   30
-#define FLAME_CHARGE_DISTANCE   50
 
 struct Locations
 {
@@ -128,6 +114,9 @@ enum IllidanSpell
     SPELL_ILLIDAN_FLAME_CRASH            = 40832,
     SPELL_ILLIDAN_PARASITIC_SHADOWFIEND  = 41917,
 
+    // Phase 3 spells
+    SPELL_ILLIDAN_AGONIZING_FLAMES       = 40932,
+
     // Phase 2 spells
     SPELL_ILLIDAN_THROW_GLAIVE           = 39635,
     SPELL_ILLIDAN_GLAIVE_RETURN          = 39873,
@@ -142,6 +131,7 @@ enum IllidanSpell
     SPELL_ILLIDAN_DEMON_FORM             = 40506,
     SPELL_ILLIDAN_SHADOW_BLAST           = 41078,
     SPELL_ILLIDAN_FLAME_BURST            = 41126,
+    SPELL_ILLIDAN_SHADOW_DEMON           = 41120
 };
 
 enum IllidanEvent
@@ -149,7 +139,6 @@ enum IllidanEvent
     EVENT_ILLIDAN_START                  = 1,
     EVENT_ILLIDAN_CHANGE_PHASE           = 2,
     EVENT_ILLIDAN_SUMMON_MINIONS         = 3,
-    EVENT_ILLIDAN_HARD_ENRAGE            = 4,
 
     // Phase 1,3,5 events
     EVENT_ILLIDAN_SHEAR                  = 5,
@@ -182,6 +171,7 @@ enum IllidanEvent
 
     // Phase: Maiev summon
     EVENT_ILLIDAN_SUMMON_MAIEV           = 28,
+    EVENT_ILLIDAN_CAGE_TRAP              = 29,
 
     EVENT_ILLIDAN_RANDOM_YELL
 };
@@ -209,8 +199,6 @@ enum CreatureEntries
     BLADE_OF_AZZINOTH       =   22996,
     FLAME_OF_AZZINOTH       =   22997,
     MAIEV_SHADOWSONG        =   23197,
-    SHADOW_DEMON            =   23375,
-    ILLIDAN_DOOR_TRIGGER    =   23412,
 
     ILLIDARI_ELITE          =   23226,
     PARASITIC_SHADOWFIEND   =   23498,
@@ -219,12 +207,16 @@ enum CreatureEntries
 
 struct TRINITY_DLL_DECL boss_illidan_stormrageAI : public BossAI
 {
-    boss_illidan_stormrageAI(Creature* c) : BossAI(c, 1){}
+    boss_illidan_stormrageAI(Creature* c) : BossAI(c, 1)
+    {
+        ForceSpellCast(me, SPELL_ILLIDAN_KNEEL_INTRO, INTERRUPT_AND_CAST_INSTANTLY);
+    }
 
     uint64 m_maievGUID;
     uint32 m_hoverPoint;
 
     uint32 m_combatTimer;
+    uint32 m_enrageTimer;
 
     bool b_maievPhase;
 
@@ -237,6 +229,7 @@ struct TRINITY_DLL_DECL boss_illidan_stormrageAI : public BossAI
         summons.DespawnAll();
 
         m_combatTimer = 1000;
+        m_enrageTimer = 25*60000;
 
         m_maievGUID = 0;
 
@@ -248,6 +241,7 @@ struct TRINITY_DLL_DECL boss_illidan_stormrageAI : public BossAI
 
         SetWarglaivesEquipped(false);
 
+        me->SetReactState(REACT_AGGRESSIVE);
         me->RemoveUnitMovementFlag(MOVEFLAG_LEVITATING);
         me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
     }
@@ -269,10 +263,11 @@ struct TRINITY_DLL_DECL boss_illidan_stormrageAI : public BossAI
             case PHASE_FIVE:
             {
                 events.ScheduleEvent(EVENT_ILLIDAN_SOFT_ENRAGE, 40000, m_phase);
+                events.ScheduleEvent(EVENT_ILLIDAN_CAGE_TRAP, 30000, m_phase);
             }
             case PHASE_THREE:
             {
-                events.ScheduleEvent(EVENT_ILLIDAN_AGONIZING_FLAMES, 1000, m_phase);
+                events.ScheduleEvent(EVENT_ILLIDAN_AGONIZING_FLAMES, urand(28000, 35000), m_phase);
                 events.ScheduleEvent(EVENT_ILLIDAN_CHANGE_PHASE, m_phase == PHASE_FIVE ? 60000 : urand(40000, 55000), m_phase);
             }
             case PHASE_ONE:
@@ -348,7 +343,15 @@ struct TRINITY_DLL_DECL boss_illidan_stormrageAI : public BossAI
 
                         // Call back Akama to deal with minions
                         if (Creature *pAkama = instance->GetCreature(instance->GetData64(DATA_AKAMA)))
+                        {
+                            pAkama->AttackStop();
+                            pAkama->SetReactState(REACT_PASSIVE);
+
+                            if (HostilReference* pRef = me->getThreatManager().getOnlineContainer().getReferenceByTarget(pAkama))
+                                 pRef->removeReference();
+
                             pAkama->AI()->DoAction(8); // EVENT_AKAMA_MINIONS_FIGHT
+                        }
                     }
                     else
                         events.ScheduleEvent(EVENT_ILLIDAN_SUMMON_MINIONS, 1000, PHASE_ONE);
@@ -390,6 +393,14 @@ struct TRINITY_DLL_DECL boss_illidan_stormrageAI : public BossAI
                         AddSpellToCast(pTarget, SPELL_ILLIDAN_PARASITIC_SHADOWFIEND);
 
                     events.ScheduleEvent(EVENT_ILLIDAN_PARASITIC_SHADOWFIEND, 30000, m_phase);
+                    break;
+                }
+                case EVENT_ILLIDAN_AGONIZING_FLAMES:
+                {
+                    if (Unit *pTarget = SelectUnit(SELECT_TARGET_RANDOM, 0 , 150.0f, true, 0, 15.0f))
+                        AddSpellToCast(pTarget, SPELL_ILLIDAN_AGONIZING_FLAMES);
+
+                    events.ScheduleEvent(EVENT_ILLIDAN_AGONIZING_FLAMES, urand(30000, 35000), m_phase);
                     break;
                 }
             }
@@ -434,6 +445,46 @@ struct TRINITY_DLL_DECL boss_illidan_stormrageAI : public BossAI
                         events.ScheduleEvent(EVENT_ILLIDAN_RETURN_GLAIVE, 3000, m_phase);
                         break;
                     }
+                    /*else
+                    {
+                        std::list<Creature*> tearsList = DoFindAllCreaturesWithEntry(FLAME_OF_AZZINOTH, 200.0f);
+                        if (tearsList.size() < 2)
+                        {
+                            events.ScheduleEvent(EVENT_ILLIDAN_CHANGE_PHASE, 2000, m_phase);
+                            break;
+                        }
+
+                        std::list<Unit*> listOne, listTwo;
+                        Creature* tearOne = *tearsList.begin();
+                        Creature* tearTwo = *(++tearsList.begin());
+
+                        CAST_AI(ScriptedAI, tearOne->AI())->SelectUnitList(listOne, 25, SELECT_TARGET_FARTHEST, 100.0f, true, 25.0f);
+                        CAST_AI(ScriptedAI, tearTwo->AI())->SelectUnitList(listTwo, 25, SELECT_TARGET_FARTHEST, 100.0f, true, 25.0f);
+
+                        if (!listOne.empty() && !listTwo.empty())
+                        {
+                            for (std::list<Unit*>::iterator it = listOne.begin(); it != listOne.end(); ++it)
+                            {
+                                for (std::list<Unit*>::iterator it2 = listTwo.begin(); it2 != listTwo.end(); ++it2)
+                                {
+                                    if ((*it)->GetGUID() == (*it2)->GetGUID())
+                                    {
+                                        tearOne->CastSpell(tearOne, SPELL_FLAME_ENRAGE, true);
+                                        tearTwo->CastSpell(tearTwo, SPELL_FLAME_ENRAGE, true);
+
+                                        tearOne->CastSpell((*it), SPELL_CHARGE, true);
+                                        tearTwo->CastSpell((*it2), SPELL_CHARGE, true);
+
+                                        CAST_AI(ScriptedAI, tearOne->AI())->DoResetThreat();
+                                        CAST_AI(ScriptedAI, tearTwo->AI())->DoResetThreat();
+                                        events.ScheduleEvent(EVENT_ILLIDAN_CHANGE_PHASE, 10000, m_phase);
+                                        return false;
+
+                                    }
+                                }
+                            }
+                        }
+                    }*/
                     events.ScheduleEvent(EVENT_ILLIDAN_CHANGE_PHASE, 2000, m_phase);
                     break;
                 }
@@ -543,6 +594,12 @@ struct TRINITY_DLL_DECL boss_illidan_stormrageAI : public BossAI
                 }
                 case EVENT_ILLIDAN_SHADOW_DEMON:
                 {
+                    for (uint8 i = 0; i < 4; i++)
+                    {
+                        // Yes we can have multiple demons assigned to one person, Tank shouldn't be excluded from search :]
+                        if (Unit *pTarget = SelectUnit(SELECT_TARGET_RANDOM, 0, 150.0f, true))
+                            pTarget->CastSpell(me, SPELL_ILLIDAN_SHADOW_DEMON, true);
+                    }
                     break;
                 }
                 case EVENT_ILLIDAN_TRANSFORM_BACKNO1:
@@ -646,7 +703,6 @@ struct TRINITY_DLL_DECL boss_illidan_stormrageAI : public BossAI
     void EnterCombat(Unit *pWho)
     {
         DoZoneInCombat();
-        events.ScheduleEvent(EVENT_ILLIDAN_HARD_ENRAGE, 25*60000);
     }
 
     void KilledUnit(Unit *pWho)
@@ -685,6 +741,14 @@ struct TRINITY_DLL_DECL boss_illidan_stormrageAI : public BossAI
     void JustReachedHome()
     {
         ForceSpellCast(me, SPELL_ILLIDAN_KNEEL_INTRO, INTERRUPT_AND_CAST_INSTANTLY);
+
+        if (Creature *pAkama = instance->GetCreature(instance->GetData64(DATA_AKAMA)))
+        {
+            pAkama->AI()->Reset();
+            pAkama->AI()->EnterEvadeMode();
+            pAkama->GetMotionMaster()->MovementExpired();
+            pAkama->GetMotionMaster()->MoveTargetedHome();
+        }
     }
 
     void DoAction(const int32 action)
@@ -717,6 +781,12 @@ struct TRINITY_DLL_DECL boss_illidan_stormrageAI : public BossAI
         }
         else
             m_combatTimer -= diff;
+
+        if (m_enrageTimer < diff)
+        {
+        }
+        else
+            m_enrageTimer -= diff;
 
         if (m_phase == PHASE_ONE && HealthBelowPct(65.0f))
         {
@@ -789,13 +859,13 @@ enum AkamaEvents
     EVENT_AKAMA_DOOR_MOVE_PATH
 };
 
-enum AkamaDoorSpeech
+enum AkamaTexts
 {
     SAY_AKAMA_DOOR_SPEECH_NO1    = -1309025,
     SAY_AKAMA_DOOR_SPEECH_NO2    = -1309024,
     SAY_AKAMA_DOOR_SPEECH_NO3    = -1309028,
 
-    YELL_AKAMA_FIGHT_MINIONS     = -1999989,
+    YELL_AKAMA_FIGHT_MINIONS     = -1999990,
 
     SAY_SPIRIT_DOOR_SPEECH_NO1   = -1309026,
     SAY_SPIRIT_DOOR_SPEECH_NO2   = -1309027,
@@ -1140,10 +1210,10 @@ struct TRINITY_DLL_DECL boss_illidan_maievAI : public BossAI
     }
 };
 
-
 enum GlaiveSpells
 {
-    SPELL_GLAIVE_SUMMON_TEAR = 39855
+    SPELL_GLAIVE_SUMMON_TEAR      = 39855,
+    SPELL_GLAIVE_CHANNEL          = 39857
 };
 
 struct TRINITY_DLL_DECL boss_illidan_glaiveAI : public Scripted_NoMovementAI
@@ -1180,6 +1250,10 @@ struct TRINITY_DLL_DECL boss_illidan_glaiveAI : public Scripted_NoMovementAI
     void JustSummoned(Creature *pWho)
     {
         m_tearGUID = pWho->GetGUID();
+        ForceSpellCast(pWho, SPELL_GLAIVE_CHANNEL);
+
+        if (Creature *pIllidan = pInstance->GetCreature(pInstance->GetData64(DATA_ILLIDANSTORMRAGE)))
+            pIllidan->AI()->JustSummoned(pWho);
     }
 
     void UpdateAI(const uint32 diff)
@@ -1195,14 +1269,79 @@ struct TRINITY_DLL_DECL boss_illidan_glaiveAI : public Scripted_NoMovementAI
                 m_summonTimer -= diff;
         }
 
-        if (m_checkTimer < diff)
+        CastNextSpellIfAnyAndReady();
+    }
+};
+
+enum ShadowDemonSpells
+{
+    SPELL_SHADOW_DEMON_PASSIVE      = 41079,
+    SPELL_SHADOW_DEMON_CONSUME_SOUL = 41080,
+    SPELL_SHADOW_DEMON_FOUND_TARGET = 41082
+};
+
+struct TRINITY_DLL_DECL boss_illidan_shadowdemonAI : public ScriptedAI
+{
+    boss_illidan_shadowdemonAI(Creature *c) : ScriptedAI(c){}
+
+    uint64 m_targetGUID;
+
+    uint32 m_checkTimer;
+
+    void Reset()
+    {
+        me->SetReactState(REACT_PASSIVE);
+
+        m_checkTimer = 2000;
+        m_targetGUID = 0;
+    }
+
+    void MovementInform(uint32 type, uint32 data)
+    {
+        if (type != POINT_MOTION_TYPE || data)
+            return;
+
+        if (Unit *pTarget = me->GetUnit(m_targetGUID))
+            ForceSpellCast(pTarget, SPELL_SHADOW_DEMON_CONSUME_SOUL, INTERRUPT_AND_CAST_INSTANTLY);
+
+        if (Unit *pTarget = SelectUnit(SELECT_TARGET_RANDOM, 0, 100.0f, true))
         {
-            if (Creature *pTear = pInstance->GetCreature(m_tearGUID))
-            {
-            }
+            m_targetGUID = pTarget->GetGUID();
+            ForceSpellCast(pTarget, SPELL_SHADOW_DEMON_FOUND_TARGET);
         }
-        else
-            m_checkTimer -= diff;
+    }
+
+    void IsSummonedBy(Unit *pSummoner)
+    {
+        DoZoneInCombat();
+
+        m_targetGUID = pSummoner->GetGUID();
+
+        ForceSpellCast(pSummoner, SPELL_SHADOW_DEMON_FOUND_TARGET);
+        ForceSpellCast(me, SPELL_SHADOW_DEMON_PASSIVE);
+    }
+
+    void UpdateAI(const uint32 diff)
+    {
+        if (m_targetGUID)
+        {
+            if (m_checkTimer < diff)
+            {
+                Unit *pUnit = me->GetUnit(m_targetGUID);
+                if (!pUnit)
+                {
+                    if (Unit *pTarget = SelectUnit(SELECT_TARGET_RANDOM, 0, 100.0f, true))
+                    {
+                        m_targetGUID = pTarget->GetGUID();
+                        ForceSpellCast(pTarget, SPELL_SHADOW_DEMON_FOUND_TARGET);
+                    }
+                }
+
+                m_checkTimer = 2000;
+            }
+            else
+                m_checkTimer -= diff;
+        }
 
         CastNextSpellIfAnyAndReady();
     }
@@ -1215,23 +1354,22 @@ bool GossipSelect_boss_illidan_akama(Player *pPlayer, Creature *pCreature, uint3
         pPlayer->CLOSE_GOSSIP_MENU();
         pCreature->AI()->DoAction(EVENT_AKAMA_START);
     }
+    else
+        pPlayer->CLOSE_GOSSIP_MENU();
+
     return true;
 }
 
 bool GossipHello_boss_illidan_akama(Player *player, Creature *_Creature)
 {
-    player->ADD_GOSSIP_ITEM(0, GOSSIP_ITEM, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF);
+    if (player->isGameMaster())
+        player->ADD_GOSSIP_ITEM(0, GOSSIP_ITEM, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF);
+    else
+        player->ADD_GOSSIP_ITEM(0, GOSSIP_ITEM1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+1);
+
     player->SEND_GOSSIP_MENU(10465, _Creature->GetGUID());
     return true;
 }
-
-enum demonSpells
-{
-    SPELL_SHADOW_DEMON_PASSIVE      = 41079,  // Adds the "shadowform" aura to Shadow Demons.
-    SPELL_SHADOW_DEMON_CONSUME_SOUL = 41080,  // Once the Shadow Demons reach their target, they use this to kill them
-    SPELL_SHADOW_DEMON_PARALYZE     = 41083,  // Shadow Demons cast this on their target
-    SPELL_SHADOW_DEMON_PURPLE_BEAM  = 39123   // Purple Beam connecting Shadow Demon to their target
-};
 
 CreatureAI* GetAI_boss_illidan_stormrage(Creature *_Creature)
 {
@@ -1251,6 +1389,11 @@ CreatureAI* GetAI_boss_illidan_maiev(Creature *_Creature)
 CreatureAI* GetAI_boss_illidan_glaive(Creature *_Creature)
 {
     return new boss_illidan_glaiveAI (_Creature);
+}
+
+CreatureAI* GetAI_boss_illidan_shadowdemon(Creature *_Creature)
+{
+    return new boss_illidan_shadowdemonAI (_Creature);
 }
 
 void AddSC_boss_illidan()
@@ -1278,12 +1421,18 @@ void AddSC_boss_illidan()
     newscript->Name = "boss_illidan_glaive";
     newscript->GetAI = &GetAI_boss_illidan_glaive;
     newscript->RegisterSelf();
+
+    newscript = new Script;
+    newscript->Name = "boss_illidan_shadowdemon";
+    newscript->GetAI = &GetAI_boss_illidan_shadowdemon;
+    newscript->RegisterSelf();
 }
 /*
 DELETE FROM `spell_script_target` WHERE `entry` = '39635';
 INSERT INTO `spell_script_target` (`entry`,`type`,`targetEntry`) VALUES ('39635','1','23448');
 UPDATE `creature_template` SET `ScriptName` = 'boss_illidan_glaive' WHERE `entry` ='22996';
 UPDATE `creature_template` SET `ScriptName` = 'boss_illidan_akama' WHERE `entry` = '23089';
+UPDATE `creature_template` SET `ScriptName` = 'boss_illidan_shadowdemon' WHERE `entry` = '23375';
 UPDATE `creature` SET `spawntimesecs`='10' WHERE `id` = '23448';
 UPDATE `script_texts` SET `type` = 0 WHERE entry IN(-1529099, -1529000, -1529001);
 DELETE FROM `creature_template_addon` WHERE `entry` = '22917';
@@ -1342,5 +1491,6 @@ INSERT INTO `waypoint_data` VALUES ('2111', '8', '795.9', '333.309', '330.807', 
 INSERT INTO `waypoint_data` VALUES ('2111', '9', '795.997', '319.96', '319.897', '0', '1', '0', '100', '0');
 INSERT INTO `waypoint_data` VALUES ('2111', '10', '794.935', '304.499', '319.761', '0', '1', '0', '100', '0');
 
-insert into `creature` (`guid`, `id`, `map`, `spawnMask`, `modelid`, `equipment_id`, `position_x`, `position_y`, `position_z`, `orientation`, `spawntimesecs`, `spawndist`, `currentwaypoint`, `curhealth`, `curmana`, `DeathState`, `MovementType`) values('180','23089','564','1','0','1679','757.588','239.638','353.281','2.26385','300','0','0','960707','607000','0','0');
+insert into `creature` (`guid`, `id`, `map`, `spawnMask`, `modelid`, `equipment_id`, `position_x`, `position_y`, `position_z`, `orientation`, `spawntimesecs`, `spawndist`, `currentwaypoint`, `curhealth`, `curmana`, `DeathState`, `MovementType`) values(DEFAULT,'23089','564','1','0','1679','757.588','239.638','353.281','2.26385','300','0','0','960707','607000','0','0');
+insert into `creature` (`guid`, `id`, `map`, `spawnMask`, `modelid`, `equipment_id`, `position_x`, `position_y`, `position_z`, `orientation`, `spawntimesecs`, `spawndist`, `currentwaypoint`, `curhealth`, `curmana`, `DeathState`, `MovementType`) values(DEFAULT,'22917','564','1','0','442','701.94','307.019','354.27','0.7300','4294967295','0','0','6070400','7588','0','0');
 */
