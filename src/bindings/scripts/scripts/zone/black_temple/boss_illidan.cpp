@@ -1715,31 +1715,23 @@ struct TRINITY_DLL_DECL boss_illidan_flameofazzinothAI : public ScriptedAI
                 {
                     DoZoneInCombat();
 
-                    if (Unit *pTarget = SelectUnit(SELECT_TARGET_FARTHEST, 0, 200.0f, true, 0, 45.0f))
+                    if (Unit *pTarget = SelectUnit(SELECT_TARGET_FARTHEST, 0, 200.0f, true, 0, 48.0f))
                     {
                         AttackStart(pTarget);
-                        me->CastSpell(pTarget, SPELL_FLAME_CHARGE, true);
-
-                        check_timer = 1000;
 
                         me->UpdateSpeed(MOVE_RUN, 20.0f);
+                        me->CastSpell(pTarget, SPELL_FLAME_CHARGE, true);
 
-                        events.ScheduleEvent(EVENT_FLAME_RANGE_CHECK, 15000);
+                        check_timer = 8000;
                     }
-                    else
+
+                    if (Creature *pOwner = me->GetMap()->GetCreature(m_owner))
                     {
-                        if (Creature *pOwner = me->GetMap()->GetCreature(m_owner))
-                        {
-                            if (!me->IsWithinDistInMap(pOwner, 30.0f) && !me->HasAura(SPELL_FLAME_ENRAGE, 0))
-                            {
-                                check_timer = 4000;
-                                me->UpdateSpeed(MOVE_RUN, 20.0f);
-                                ForceSpellCast(me, SPELL_FLAME_ENRAGE);
-                            }
-                        }
-                        events.ScheduleEvent(EVENT_FLAME_RANGE_CHECK, 2000);
+                        if (!me->IsWithinDistInMap(pOwner, 30.0f) && !me->HasAura(SPELL_FLAME_ENRAGE, 0))
+                            ForceSpellCast(me, SPELL_FLAME_ENRAGE);
                     }
 
+                    events.ScheduleEvent(EVENT_FLAME_RANGE_CHECK, 2000);
                     break;
                 }
                 case EVENT_FLAME_FLAME_BLAST:
@@ -1871,11 +1863,14 @@ struct TRINITY_DLL_DECL boss_illidan_parasite_shadowfiendAI : public ScriptedAI
 
     void UpdateAI(const uint32 diff)
     {
-        if (!me->getVictim())
+        if (!me->getVictim() || me->getVictim()->GetTypeId() == TYPEID_UNIT)
         {
             DoZoneInCombat();
             if (Unit *pTemp = SelectUnit(SELECT_TARGET_RANDOM, 0, 200.0f, true, 0, 5.0f))
             {
+                if (me->getVictim())
+                    DoModifyThreatPercent(me->getVictim(), -101);
+
                 me->AddThreat(pTemp, 10000.0f);
                 ScriptedAI::AttackStart(pTemp);
             }
