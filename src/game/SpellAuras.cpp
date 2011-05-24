@@ -2040,7 +2040,41 @@ void Aura::TriggerSpell()
                     // Cat Form
                     // trigger_spell_id not set and unknown effect triggered in this case, ignoring for while
                     case 768:
+                    {
+                        if (m_target->GetTypeId() == TYPEID_PLAYER)
+                        {
+                            const PlayerSpellMap& sp_list = ((Player *)m_target)->GetSpellMap();
+                            for (PlayerSpellMap::const_iterator itr = sp_list.begin(); itr != sp_list.end(); ++itr)
+                            {
+                                if (itr->second.state == PLAYERSPELL_REMOVED)
+                                    continue;
+
+                                SpellEntry const *spellInfo = sSpellStore.LookupEntry(itr->first);
+                                if (!spellInfo || !(spellInfo->Attributes & ((1<<6) | (1<<7))))
+                                    continue;
+
+                                if (!spellInfo->Stances & (1<<((Player *)m_target)->m_form))
+                                    continue;
+
+                                bool outdoor = m_target->GetMap()->IsOutdoors(m_target->GetPositionX(), m_target->GetPositionY(), m_target->GetPositionZ());
+                                if (outdoor && spellInfo->Attributes & SPELL_ATTR_OUTDOORS_ONLY)
+                                {
+                                    if (m_target->HasAura(spellInfo->Id, 0))
+                                        continue;
+                                    else
+                                        m_target->CastSpell(m_target, spellInfo->Id, true, NULL, this);
+                                }
+                                else if (!outdoor && spellInfo->Attributes & SPELL_ATTR_INDOORS_ONLY)
+                                {
+                                    if (m_target->HasAura(spellInfo->Id, 0))
+                                        continue;
+                                    else
+                                        m_target->CastSpell(m_target, spellInfo->Id, true, NULL, this);
+                                }
+                            }
+                        }
                         return;
+                    }
                     // Frenzied Regeneration
                     case 22842:
                     case 22895:
@@ -4122,11 +4156,6 @@ void Aura::HandleModThreat(bool apply, bool Real)
     if (!m_target->isAlive())
         return;
 
-    Unit* caster = GetCaster();
-
-    if (!caster || !caster->isAlive())
-        return;
-
     int level_diff = 0;
     int multiplier = 0;
     switch (GetId())
@@ -4896,7 +4925,12 @@ void Aura::HandlePeriodicDamage(bool apply, bool Real)
             {
                 // $AP*0.18/6 bonus per tick
                 if (apply && !loading && caster)
-                    m_modifier.m_amount += int32(caster->GetTotalAttackPowerValue(BASE_ATTACK) * 3 / 100);
+                {
+                    float attackPower = caster->GetTotalAttackPowerValue(BASE_ATTACK) + m_target->GetMeleeApAttackerBonus();
+                    attackPower += caster->GetTotalAuraModifierByMiscMask(SPELL_AURA_MOD_MELEE_ATTACK_POWER_VERSUS, m_target->GetCreatureTypeMask());
+
+                    m_modifier.m_amount += int32(attackPower * 3 / 100);
+                }
                 return;
             }
             if ((m_spellProto->Id == 41917 || m_spellProto->Id == 41914) && !apply && caster)
@@ -4930,7 +4964,9 @@ void Aura::HandlePeriodicDamage(bool apply, bool Real)
                 // 0.00743*(($MWB+$mwb)/2+$AP/14*$MWS) bonus per tick
                 if (apply && !loading && caster)
                 {
-                    float ap = caster->GetTotalAttackPowerValue(BASE_ATTACK);
+                    float ap = caster->GetTotalAttackPowerValue(BASE_ATTACK) + m_target->GetMeleeApAttackerBonus();
+                    ap += caster->GetTotalAuraModifierByMiscMask(SPELL_AURA_MOD_MELEE_ATTACK_POWER_VERSUS, m_target->GetCreatureTypeMask());
+
                     int32 mws = caster->GetAttackTime(BASE_ATTACK);
                     float mwb_min = caster->GetWeaponDamageRange(BASE_ATTACK,MINDAMAGE);
                     float mwb_max = caster->GetWeaponDamageRange(BASE_ATTACK,MAXDAMAGE);
@@ -4948,7 +4984,12 @@ void Aura::HandlePeriodicDamage(bool apply, bool Real)
             {
                 // $AP*0.06/3 bonus per tick
                 if (apply && !loading && caster)
-                    m_modifier.m_amount += int32(caster->GetTotalAttackPowerValue(BASE_ATTACK) * 2 / 100);
+                {
+                    float attackPower = caster->GetTotalAttackPowerValue(BASE_ATTACK) + m_target->GetMeleeApAttackerBonus();
+                    attackPower += caster->GetTotalAuraModifierByMiscMask(SPELL_AURA_MOD_MELEE_ATTACK_POWER_VERSUS, m_target->GetCreatureTypeMask());
+
+                    m_modifier.m_amount += int32(attackPower * 2 / 100);
+                }
                 return;
             }
             // Lacerate
@@ -4956,7 +4997,12 @@ void Aura::HandlePeriodicDamage(bool apply, bool Real)
             {
                 // $AP*0.05/5 bonus per tick
                 if (apply && !loading && caster)
-                    m_modifier.m_amount += int32(caster->GetTotalAttackPowerValue(BASE_ATTACK) / 100);
+                {
+                    float attackPower = caster->GetTotalAttackPowerValue(BASE_ATTACK) + m_target->GetMeleeApAttackerBonus();
+                    attackPower += caster->GetTotalAuraModifierByMiscMask(SPELL_AURA_MOD_MELEE_ATTACK_POWER_VERSUS, m_target->GetCreatureTypeMask());
+
+                    m_modifier.m_amount += int32(attackPower / 100);
+                }
                 return;
             }
             // Rip
@@ -4979,7 +5025,11 @@ void Aura::HandlePeriodicDamage(bool apply, bool Real)
                     }
 
                     if (cp > 4) cp = 4;
-                    m_modifier.m_amount += int32(caster->GetTotalAttackPowerValue(BASE_ATTACK) * cp / 100);
+
+                    float attackPower = caster->GetTotalAttackPowerValue(BASE_ATTACK) + m_target->GetMeleeApAttackerBonus();
+                    attackPower += caster->GetTotalAuraModifierByMiscMask(SPELL_AURA_MOD_MELEE_ATTACK_POWER_VERSUS, m_target->GetCreatureTypeMask());
+
+                    m_modifier.m_amount += int32(attackPower * cp / 100);
                 }
                 return;
             }
@@ -5018,9 +5068,12 @@ void Aura::HandlePeriodicDamage(bool apply, bool Real)
                 // Dmg/tick = $AP*min(0.01*$cp, 0.03) [Like Rip: only the first three CP increase the contribution from AP]
                 if (apply && !loading && caster && caster->GetTypeId() == TYPEID_PLAYER)
                 {
+                    float attackPower = caster->GetTotalAttackPowerValue(BASE_ATTACK) + m_target->GetMeleeApAttackerBonus();
+                    attackPower += caster->GetTotalAuraModifierByMiscMask(SPELL_AURA_MOD_MELEE_ATTACK_POWER_VERSUS, m_target->GetCreatureTypeMask());
+
                     uint8 cp = ((Player*)caster)->GetComboPoints();
                     if (cp > 3) cp = 3;
-                    m_modifier.m_amount += int32(caster->GetTotalAttackPowerValue(BASE_ATTACK) * cp / 100);
+                    m_modifier.m_amount += int32(attackPower * cp / 100);
                 }
                 return;
             }
@@ -5029,7 +5082,12 @@ void Aura::HandlePeriodicDamage(bool apply, bool Real)
             {
                 // $AP*0.18/6 bonus per tick
                 if (apply && !loading && caster)
-                    m_modifier.m_amount += int32(caster->GetTotalAttackPowerValue(BASE_ATTACK) * 3 / 100);
+                {
+                    float attackPower = caster->GetTotalAttackPowerValue(BASE_ATTACK) + m_target->GetMeleeApAttackerBonus();
+                    attackPower += caster->GetTotalAuraModifierByMiscMask(SPELL_AURA_MOD_MELEE_ATTACK_POWER_VERSUS, m_target->GetCreatureTypeMask());
+
+                    m_modifier.m_amount += int32(attackPower * 3 / 100);
+                }
                 return;
             }
             break;
@@ -5041,7 +5099,12 @@ void Aura::HandlePeriodicDamage(bool apply, bool Real)
             {
                 // $RAP*0.1/5 bonus per tick
                 if (apply && !loading && caster)
-                    m_modifier.m_amount += int32(caster->GetTotalAttackPowerValue(RANGED_ATTACK) * 10 / 500);
+                {
+                    float attackPower = caster->GetTotalAttackPowerValue(RANGED_ATTACK) + m_target->GetTotalAuraModifier(SPELL_AURA_RANGED_ATTACK_POWER_ATTACKER_BONUS);
+                    attackPower += caster->GetTotalAuraModifierByMiscMask(SPELL_AURA_MOD_RANGED_ATTACK_POWER_VERSUS, m_target->GetCreatureTypeMask());
+
+                    m_modifier.m_amount += int32(attackPower * 10 / 500);
+                }
                 return;
             }
             // Immolation Trap
@@ -5049,7 +5112,12 @@ void Aura::HandlePeriodicDamage(bool apply, bool Real)
             {
                 // $RAP*0.1/5 bonus per tick
                 if (apply && !loading && caster)
-                    m_modifier.m_amount += int32(caster->GetTotalAttackPowerValue(RANGED_ATTACK) * 10 / 500);
+                {
+                    float attackPower = caster->GetTotalAttackPowerValue(RANGED_ATTACK) + m_target->GetTotalAuraModifier(SPELL_AURA_RANGED_ATTACK_POWER_ATTACKER_BONUS);
+                    attackPower += caster->GetTotalAuraModifierByMiscMask(SPELL_AURA_MOD_RANGED_ATTACK_POWER_VERSUS, m_target->GetCreatureTypeMask());
+
+                    m_modifier.m_amount += int32(attackPower * 10 / 500);
+                }
                 return;
             }
             break;
@@ -6133,6 +6201,13 @@ void Aura::HandleShapeshiftBoosts(bool apply)
 
                 SpellEntry const *spellInfo = sSpellStore.LookupEntry(itr->first);
                 if (!spellInfo || !(spellInfo->Attributes & ((1<<6) | (1<<7))))
+                    continue;
+
+                bool outdoor = m_target->GetMap()->IsOutdoors(m_target->GetPositionX(), m_target->GetPositionY(), m_target->GetPositionZ());
+                if (outdoor && spellInfo->Attributes & SPELL_ATTR_INDOORS_ONLY)
+                    continue;
+
+                if (!outdoor && spellInfo->Attributes & SPELL_ATTR_OUTDOORS_ONLY)
                     continue;
 
                 if (spellInfo->Stances & (1<<form))
