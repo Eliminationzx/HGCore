@@ -313,23 +313,26 @@ void ApplySpellThreatModifiers(SpellEntry const *spellInfo, float &threat)
     if (!spellInfo)
         return;
 
-    if (spellInfo->SpellFamilyName == SPELLFAMILY_WARLOCK && spellInfo->SpellFamilyFlags == 256) // Searing Pain
+    if (spellInfo->SpellFamilyName == SPELLFAMILY_WARLOCK && spellInfo->SpellFamilyFlags & 0x100LL) // Searing Pain
         threat *= 2.0f;
 
-    else if (spellInfo->SpellFamilyName == SPELLFAMILY_SHAMAN && spellInfo->SpellFamilyFlags == SPELLFAMILYFLAG_SHAMAN_FROST_SHOCK)
+    else if (spellInfo->SpellFamilyName == SPELLFAMILY_SHAMAN && spellInfo->SpellFamilyFlags & SPELLFAMILYFLAG_SHAMAN_FROST_SHOCK)
         threat *= 2.0f;
 
-    else if (spellInfo->SpellFamilyName == SPELLFAMILY_PALADIN && spellInfo->SpellFamilyFlags == 0x4000000000LL) // Holy shield
+    else if (spellInfo->SpellFamilyName == SPELLFAMILY_PALADIN && spellInfo->SpellFamilyFlags & 0x4000000000LL) // Holy shield
         threat *= 1.35f;
 
-    else if (spellInfo->SpellFamilyName == SPELLFAMILY_DRUID && spellInfo->SpellFamilyFlags == 0x10000000000LL) // Lacerate
+    else if (spellInfo->SpellFamilyName == SPELLFAMILY_DRUID && spellInfo->SpellFamilyFlags & 0x10000000000LL) // Lacerate
         threat *= 0.20f;
 
-    else if (spellInfo->SpellFamilyName == SPELLFAMILY_PRIEST && (spellInfo->SpellFamilyFlags & 0x8400000LL))    // Holy Nova
+    else if (spellInfo->SpellFamilyName == SPELLFAMILY_PRIEST && spellInfo->SpellFamilyFlags & 0x8400000LL)    // Holy Nova
         threat = 1.0f;
 
     else if (spellInfo->Id == 33619) // Reflective shield
         threat = 1.0f;
+
+    else if (spellInfo->SpellFamilyName == SPELLFAMILY_WARRIOR && spellInfo->SpellFamilyFlags & 0x80LL) // Thunder Clap
+        threat *= 1.75f;
 }
 
 uint32 CalculatePowerCost(SpellEntry const * spellInfo, Unit const * caster, SpellSchoolMask schoolMask)
@@ -2654,10 +2657,15 @@ void SpellMgr::LoadSpellCustomAttr()
 
         switch (i)
         {
-        // Blind fly mode
-        case 2094:
-            spellInfo->speed = 25;
+        /* ROGUE CUSTOM ATTRIBUTES */
+        case 2094:                     // Blind
+            spellInfo->speed = 590.0f; // add speed to add delay for hit.
             break;
+        case 5171:
+        case 6774:                     // Slice'n'Dice
+            spellInfo->AttributesEx3 &= ~SPELL_ATTR_EX3_NO_INITIAL_AGGRO; // Do not put caster in combat after use
+            break;
+        /* UNSORTED */
         case 40017: // If we can't adjust speed :P we spawn it in bigger periods
             spellInfo->EffectAmplitude[1] = 1900;
             break;

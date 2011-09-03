@@ -4629,7 +4629,7 @@ void Player::JoinLFGChannel()
 {
     if (ChannelMgr* cMgr = channelMgr(GetTeam()))
         if (Channel *chn = cMgr->GetJoinChannel("LookingForGroup", 26))
-            chn->Join(GetGUID(), "");
+            chn->Invite(GetGUID(), GetName());
 }
 
 void Player::UpdateDefense()
@@ -15074,8 +15074,14 @@ bool Player::isAllowedToLoot(Creature* creature)
         return false;
     }
     else
+    {
+        // recipient may be offline, maybe there is list of players allowed to loot
+        if(creature->HasPlayersAllowedToLoot() && creature->IsPlayerAllowedToLoot(this))
+            return true;
+
         // prevent other players from looting if the recipient got disconnected
         return !creature->hasLootRecipient();
+    }
 }
 
 void Player::_LoadActions(QueryResultAutoPtr result)
@@ -19929,17 +19935,22 @@ PartyResult Player::CanUninviteFromGroup() const
 
 void Player::LFGAttemptJoin()
 {
-    // skip not can autojoin cases and player group case
+    // skip autojoin disabled and player in group cases
     if (m_lookingForGroup.canAutoJoin() || GetGroup())
         return;
 
+    bool found = false;
+    std::list<uint64> fullList;
+
     for (uint8 i = 0; i < MAX_LOOKING_FOR_GROUP_SLOT; ++i)
     {
-        tbb::concurrent_hash_map<uint32, std::list<uint64> >::const_accessor a;
-
+        // skip empty slot
         if (m_lookingForGroup.slots[i].Empty())
             continue;
 
+        tbb::concurrent_hash_map<uint32, std::list<uint64> >::const_accessor a; // const_accessor -> write lock only
+
+        // skip if container doesn't exist
         if (!sWorld.lfgContainer.find(a, m_lookingForGroup.slots[i].Combine()))
             continue;
 
@@ -19974,7 +19985,7 @@ void Player::LFGAttemptJoin()
             if (!plr->GetGroup())
             {
                 Group* group = new Group;
-                if (!group->Create(plr->GetGUID(), plr->GetName()))
+                if (!group->Create(plr->GetGUID(), plr->GetName(), true))
                 {
                     delete group;
                     continue;
@@ -19984,10 +19995,11 @@ void Player::LFGAttemptJoin()
             }
 
             // stop at success join
-            if (plr->GetGroup()->AddMember(GetGUID(), GetName()))
+            if (plr->GetGroup()->AddMember(GetGUID(), GetName(), true))
             {
                 if (sWorld.getConfig(CONFIG_RESTRICTED_LFG_CHANNEL) && GetSession()->GetSecurity() == SEC_PLAYER)
                     LeaveLFGChannel();
+                found = true;
                 break;
             }
             // full
@@ -19995,8 +20007,26 @@ void Player::LFGAttemptJoin()
             {
                 if (sWorld.getConfig(CONFIG_RESTRICTED_LFG_CHANNEL) && plr->GetSession()->GetSecurity() == SEC_PLAYER)
                     plr->LeaveLFGChannel();
+
+                fullList.push_back(*itr);
             }
         }
+    }
+
+    if (found)
+    {
+        ClearLFG();
+        ClearLFM();
+    }
+
+    for (std::list<uint64>::const_iterator itr = fullList.begin(); itr != fullList.end(); ++itr)
+    {
+        Player * plr = ObjectAccessor::GetPlayer(*itr);
+
+        if (!plr)
+            continue;
+
+        plr->ClearLFM();
     }
 }
 
@@ -20015,6 +20045,8 @@ void Player::LFMAttemptAddMore()
     // get player container for LFM id
     if (!sWorld.lfgContainer.find(a, m_lookingForGroup.more.Combine()))
         return;
+
+    std::list<uint64> joinedList;
 
     for (std::list<uint64>::const_iterator iter = a->second.begin(); iter != a->second.end(); ++iter)
     {
@@ -20038,7 +20070,7 @@ void Player::LFMAttemptAddMore()
         if (!GetGroup())
         {
             Group* group = new Group;
-            if (!group->Create(GetGUID(), GetName()))
+            if (!group->Create(GetGUID(), GetName(), true))
             {
                 delete group;
                 return;                                     // can't create group (??)
@@ -20048,17 +20080,19 @@ void Player::LFMAttemptAddMore()
         }
 
         // stop at join fail (full)
-        if (!GetGroup()->AddMember(plr->GetGUID(), plr->GetName()))
+        if (!GetGroup()->AddMember(plr->GetGUID(), plr->GetName(), true))
         {
             if (sWorld.getConfig(CONFIG_RESTRICTED_LFG_CHANNEL) && GetSession()->GetSecurity() == SEC_PLAYER)
                 LeaveLFGChannel();
 
-            return;
+            break;
         }
 
         // joined
         if (sWorld.getConfig(CONFIG_RESTRICTED_LFG_CHANNEL) && plr->GetSession()->GetSecurity() == SEC_PLAYER)
             plr->LeaveLFGChannel();
+
+        joinedList.push_back(*iter);
 
         // and group full
         if (GetGroup()->IsFull())
@@ -20066,14 +20100,32 @@ void Player::LFMAttemptAddMore()
             if (sWorld.getConfig(CONFIG_RESTRICTED_LFG_CHANNEL) && GetSession()->GetSecurity() == SEC_PLAYER)
                 LeaveLFGChannel();
 
-            return;
+            break;
         }
+    }
+
+    a.release();
+
+    // clear LFG and LFM for players joined to our pt
+    for (std::list<uint64>::const_iterator itr = joinedList.begin(); itr != joinedList.end(); ++itr)
+    {
+        Player *plr = ObjectAccessor::GetPlayer(*itr);
+
+        if (!plr)
+            continue;
+
+        plr->ClearLFG();
+        plr->ClearLFM();
     }
 }
 
 void Player::LFGSet(uint8 slot, uint32 entry, uint32 type)
 {
     if (slot >= MAX_LOOKING_FOR_GROUP_SLOT)
+        return;
+
+    // don't add GM to lfg list
+    if (GetSession()->GetSecurity() > SEC_PLAYER)
         return;
 
     tbb::concurrent_hash_map<uint32, std::list<uint64> >::accessor a;
@@ -20123,21 +20175,28 @@ void Player::LFGSet(uint8 slot, uint32 entry, uint32 type)
 
     m_lookingForGroup.slots[slot].Set(entry, type);
     a->second.push_back(guid);
+
+    JoinLFGChannel();
 }
 
 void Player::LFMSet(uint32 entry, uint32 type)
 {
+    // don't add GM to lfm list
+    if (GetSession()->GetSecurity() > SEC_PLAYER)
+        return;
+
     // don't add to lfm list if still in lfg
-//    for (uint8 i = 0; i < MAX_LOOKING_FOR_GROUP_SLOT; ++i)
-//        if (!m_lookingForGroup.slots[i].Empty())
-//            return;
+    for (uint8 i = 0; i < MAX_LOOKING_FOR_GROUP_SLOT; ++i)
+        if (!m_lookingForGroup.slots[i].Empty())
+            return;
 
     // don't add to lfm if in group and not leader (for cases when group member wants check instance list or for raid assists)
     if (GetGroup() && !GetGroup()->IsLeader(GetGUID()))
         return;
 
+    // clear lfg when player want looking for more
     ClearLFG();
-    tbb::concurrent_hash_map<uint32, std::list<uint64> >::accessor a;
+    tbb::concurrent_hash_map<uint32, std::list<uint64> >::accessor a;   // accessor - read and write lock
 
     uint64 guid = GetGUID();
     uint32 combined;
@@ -20172,7 +20231,9 @@ void Player::LFMSet(uint32 entry, uint32 type)
 
     m_lookingForGroup.more.Set(entry, type);
     a->second.push_back(guid);
-    GetSession()->UpdateLFM();
+    GetSession()->SendUpdateLFM();
+
+    JoinLFGChannel();
 }
 
 void Player::ClearLFG()
@@ -20203,7 +20264,7 @@ void Player::ClearLFG()
     }
 
     LeaveLFGChannel();
-    GetSession()->UpdateLFG();
+    GetSession()->SendUpdateLFG();
 }
 
 void Player::ClearLFM()
@@ -20226,7 +20287,7 @@ void Player::ClearLFM()
     m_lookingForGroup.more.Clear();
 
     LeaveLFGChannel();
-    GetSession()->UpdateLFM();
+    GetSession()->SendUpdateLFM();
 }
 
 uint8 Player::IsLFM(uint32 type, uint32 entry)

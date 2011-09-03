@@ -2947,10 +2947,6 @@ void Spell::EffectApplyAura(uint32 i)
     // Prayer of Mending (jump animation), we need formal caster instead original for correct animation
     if (m_spellInfo->SpellFamilyName == SPELLFAMILY_PRIEST && (m_spellInfo->SpellFamilyFlags & 0x00002000000000LL))
         m_caster->CastSpell(unitTarget, 41637, true, NULL, Aur, m_originalCasterGUID);
-    
-    // WF don't send log to player (AP aura)    
-    if (m_spellInfo->SpellFamilyName == SPELLFAMILY_SHAMAN && m_spellInfo->SpellFamilyFlags & 0x200000000LL)
-        m_needSpellLog = false;
 }
 
 void Spell::EffectUnlearnSpecialization(uint32 i)
@@ -6903,25 +6899,22 @@ void Spell::EffectAddExtraAttacks(uint32 /*i*/)
     if (!victim || !unitTarget->IsWithinMeleeRange(victim) || !unitTarget->HasInArc(2*M_PI/3, victim))
         return;
 
+    if (unitTarget->m_currentSpells[CURRENT_MELEE_SPELL])
+        unitTarget->m_currentSpells[CURRENT_MELEE_SPELL]->cast();
+
     // Only for proc/log informations
     unitTarget->m_extraAttacks = damage;
-
     // Need to send log before attack is made
     SendLogExecute();
     m_needSpellLog = false;
 
-    for (uint8 i = 0; i < damage; i++)
-    {
-        MeleeDamageLog damageInfo(unitTarget, victim, SPELL_SCHOOL_MASK_NORMAL, BASE_ATTACK);
-        unitTarget->CalculateMeleeDamage(&damageInfo);
-
-        unitTarget->DealMeleeDamage(&damageInfo, true);
-        unitTarget->ProcDamageAndSpell(damageInfo.target, damageInfo.procAttacker, damageInfo.procVictim, damageInfo.procEx, damageInfo.damage, damageInfo.attackType);
-
-        unitTarget->m_extraAttacks--;
-    }
-
     unitTarget->resetAttackTimer(BASE_ATTACK);
+
+    MeleeDamageLog damageInfo(unitTarget, victim, SPELL_SCHOOL_MASK_NORMAL, BASE_ATTACK);
+    unitTarget->CalculateMeleeDamage(&damageInfo);
+
+    unitTarget->DealMeleeDamage(&damageInfo, true);
+    unitTarget->ProcDamageAndSpell(damageInfo.target, damageInfo.procAttacker, damageInfo.procVictim, damageInfo.procEx, damageInfo.damage, damageInfo.attackType, m_spellInfo);
 }
 
 void Spell::EffectParry(uint32 /*i*/)
@@ -7281,7 +7274,7 @@ void Spell::EffectPlayerPull(uint32 i)
     if (damage && dist > damage)
         dist = damage;
 
-    unitTarget->KnockBackFrom(m_caster, -dist, m_spellInfo->EffectMiscValue[i]/100.0);
+    unitTarget->KnockBackFrom(m_caster, -dist, m_spellInfo->EffectMiscValue[i]/10.0);
 }
 
 void Spell::EffectDispelMechanic(uint32 i)

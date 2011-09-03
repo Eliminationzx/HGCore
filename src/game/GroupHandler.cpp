@@ -272,6 +272,9 @@ void WorldSession::HandleGroupUninviteGuidOpcode(WorldPacket & recv_data)
 
     if (grp->IsMember(guid))
     {
+        if (grp->IsLeader(guid) && grp->IsAssistant(GetPlayer()->GetGUID()))
+            return;
+
         Player::RemoveFromGroup(grp,guid);
         return;
     }
@@ -316,6 +319,9 @@ void WorldSession::HandleGroupUninviteNameOpcode(WorldPacket & recv_data)
 
     if (uint64 guid = grp->GetMemberGUID(membername))
     {
+        if (grp->IsLeader(guid) && grp->IsAssistant(GetPlayer()->GetGUID()))
+            return;
+
         Player::RemoveFromGroup(grp,guid);
         return;
     }

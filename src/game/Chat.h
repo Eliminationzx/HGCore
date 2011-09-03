@@ -86,6 +86,9 @@ class ChatHandler
 
         void SendGlobalSysMessage(const char *str);
         void SendGlobalGMSysMessage(const char *str);
+        void SendGlobalGMSysMessage(int32 entry, ...);
+
+        bool SendGMMail(const char* pName, const char* msgSubject, const char* msgText);
 
         bool ExecuteCommandInTable(ChatCommand *table, const char* text, const std::string& fullcommand);
         bool ShowHelpForCommand(ChatCommand *table, const char* cmd);
@@ -450,6 +453,7 @@ class ChatHandler
         bool HandleGMTicketGetByIdCommand(const char* args);
         bool HandleGMTicketGetByNameCommand(const char* args);
         bool HandleGMTicketCloseByIdCommand(const char* args);
+        bool HandleGMTicketResponseCommand(const char* args);
         bool HandleGMTicketAssignToCommand(const char* args);
         bool HandleGMTicketUnAssignCommand(const char* args);
         bool HandleGMTicketCommentCommand(const char* args);

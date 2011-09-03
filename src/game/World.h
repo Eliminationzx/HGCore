@@ -603,6 +603,7 @@ class World
 
         void InitDailyQuestResetTime();
         void ResetDailyQuests();
+
     private:
         static volatile bool m_stopEvent;
         static uint8 m_ExitCode;

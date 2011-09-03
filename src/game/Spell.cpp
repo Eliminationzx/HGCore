@@ -655,8 +655,12 @@ void Spell::prepareDataForTriggerSystem()
                 m_procAttacker |= PROC_FLAG_SUCCESSFUL_OFFHAND_HIT;
 
             m_procVictim   = PROC_FLAG_TAKEN_MELEE_SPELL_HIT;
+
             if (IsNextMeleeSwingSpell())
-                m_procVictim |= PROC_FLAG_TAKEN_MELEE_HIT;
+            {
+                //m_procAttacker |= PROC_FLAG_SUCCESSFUL_MELEE_HIT;
+                m_procVictim   |= PROC_FLAG_TAKEN_MELEE_HIT;
+            }
             break;
         case SPELL_DAMAGE_CLASS_RANGED:
             m_procAttacker = PROC_FLAG_SUCCESSFUL_RANGED_SPELL_HIT;
@@ -2544,9 +2548,6 @@ void Spell::cast(bool skipCheck)
                     m_caster->CastSpell(m_targets.getUnitTarget() ? m_targets.getUnitTarget() : m_caster, *i, true);
     }
 
-    if (m_caster->GetTypeId() == TYPEID_UNIT && m_spellInfo->AttributesCu & SPELL_ATTR_CU_VISUAL_TARGET)
-        ((Creature*)m_caster)->SetSelection(m_targets.getUnitTarget() ? m_targets.getUnitTarget()->GetGUID() : 0);
-
     SetExecutedCurrently(false);
 }
 
@@ -2999,9 +3000,6 @@ void Spell::finish(bool ok)
     // Stop Attack for some spells
     if (m_spellInfo->Attributes & SPELL_ATTR_STOP_ATTACK_TARGET)
         m_caster->AttackStop();
-
-    if (m_caster->GetTypeId() == TYPEID_UNIT && m_spellInfo->AttributesCu & SPELL_ATTR_CU_VISUAL_TARGET)
-        ((Creature*)m_caster)->SetSelection(m_caster->getVictimGUID());
 }
 
 void Spell::SendCastResult(uint8 result)

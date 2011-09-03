@@ -218,6 +218,8 @@ void WorldSession::SendLFM(uint32 type, uint32 entry)
         }
     }
 
+    a.release();
+
     // fill count placeholders
     data.put<uint32>(4+4,   number);
     data.put<uint32>(4+4+4, number);
@@ -257,6 +259,9 @@ void WorldSession::SendLFG(uint32 type, uint32 entry)
 {
     if (!_player || !_player->IsInWorld())
         return;
+
+    // hmm should be implemented ? Oo
+
     /*
     // start prepare packet;
     WorldPacket data(MSG_LOOKING_FOR_GROUP);
@@ -280,7 +285,7 @@ void WorldSession::SendLFG(uint32 type, uint32 entry)
     SendPacket(&data);*/
 }
 
-void WorldSession::UpdateLFG()
+void WorldSession::SendUpdateLFG()
 {
     if (!_player || !_player->IsInWorld())
         return;
@@ -297,7 +302,7 @@ void WorldSession::UpdateLFG()
     SendPacket(&data);
 }
 
-void WorldSession::UpdateLFM()
+void WorldSession::SendUpdateLFM()
 {
     if (!_player || !_player->IsInWorld())
         return;

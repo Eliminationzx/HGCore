@@ -550,6 +550,7 @@ ChatCommand * ChatHandler::getCommandTable()
         { "unassign",       SEC_MODERATOR,      false, &ChatHandler::HandleGMTicketUnAssignCommand,         "", NULL },
         { "comment",        SEC_MODERATOR,      false, &ChatHandler::HandleGMTicketCommentCommand,          "", NULL },
         { "history",        SEC_MODERATOR,      false, &ChatHandler::HandleGMTicketHistoryCommand,          "", NULL },
+        { "response",       SEC_MODERATOR,      false, &ChatHandler::HandleGMTicketResponseCommand,         "", NULL },
         { NULL,             0,                  false, NULL,                                                "", NULL }
     };
 
@@ -780,6 +781,17 @@ void ChatHandler::SendGlobalSysMessage(const char *str)
     }
 
     delete [] buf;
+}
+
+void ChatHandler::SendGlobalGMSysMessage(int32 entry, ...)
+{
+    const char *format = GetTrinityString(entry);
+    va_list ap;
+    char str [1024];
+    va_start(ap, entry);
+    vsnprintf(str,1024,format, ap);
+    va_end(ap);
+    SendGlobalGMSysMessage(str);
 }
 
 void ChatHandler::SendGlobalGMSysMessage(const char *str)

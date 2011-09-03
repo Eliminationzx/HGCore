@@ -6071,30 +6071,15 @@ bool Unit::HandleDummyAuraProc(Unit *pVictim, uint32 damage, Aura* triggeredByAu
                         sLog.outError("Unit::HandleDummyAuraProc: non handled spell id: %u (LO)", procSpell->Id);
                         return false;
                 }
-                // No thread generated mod
-                SpellModifier *mod = new SpellModifier;
-                mod->op = SPELLMOD_THREAT;
-                mod->value = -100;
-                mod->type = SPELLMOD_PCT;
-                mod->spellId = dummySpell->Id;
-                mod->effectId = 0;
-                mod->lastAffected = NULL;
-                mod->mask = 0x0000000000000003LL;
-                mod->charges = 0;
-                ((Player*)this)->AddSpellMod(mod, true);
 
                 // Remove cooldown (Chain Lightning - have Category Recovery time)
                 if (procSpell->SpellFamilyFlags & 0x0000000000000002LL)
                     ((Player*)this)->RemoveSpellCooldown(spellId);
 
-                // Hmmm.. in most case spells already set half basepoints but...
-                // Lightning Bolt (2-10 rank) have full basepoint and half bonus from level
-                // As on wiki:
-                // BUG: Rank 2 to 10 (and maybe 11) of Lightning Bolt will proc another Bolt with FULL damage (not halved). This bug is known and will probably be fixed soon.
-                // So - no add changes :)
-                CastSpell(pVictim, spellId, true, castItem, triggeredByAura);
+                // Lightning Overload -> -100% Threat Mod -50% DMG Mod, it has 1s duration so we don't need to remove aura 
+                CastSpell(this, 39805, true);
 
-                ((Player*)this)->AddSpellMod(mod, false);
+                CastSpell(pVictim, spellId, true, castItem, triggeredByAura);
 
                 if (cooldown && GetTypeId()==TYPEID_PLAYER)
                     ((Player*)this)->AddSpellCooldown(dummySpell->Id,0,time(NULL) + cooldown);
@@ -8731,21 +8716,6 @@ bool Unit::IsImmunedToSpellEffect(uint32 effect, uint32 mechanic) const
     return false;
 }
 
-bool Unit::IsDamageToThreatSpell(SpellEntry const * spellInfo) const
-{
-    if (!spellInfo)
-        return false;
-
-    uint32 family = spellInfo->SpellFamilyName;
-    uint64 flags = spellInfo->SpellFamilyFlags;
-
-    if ((family == 5 && flags == 256) ||                     //Searing Pain
-        (family == SPELLFAMILY_SHAMAN && flags == SPELLFAMILYFLAG_SHAMAN_FROST_SHOCK))
-        return true;
-
-    return false;
-}
-
 void Unit::MeleeDamageBonus(Unit *pVictim, uint32 *pdamage,WeaponAttackType attType, SpellEntry const *spellProto)
 {
     if (!pVictim)
@@ -11208,7 +11178,15 @@ void Unit::ProcDamageAndSpellfor (bool isVictim, Unit * pTarget, uint32 procFlag
         removedSpells.unique();
         // Remove auras from removedAuras
         for (RemoveSpellList::const_iterator i = removedSpells.begin(); i != removedSpells.end();i++)
+        {
+            if (Aura *pTemp = GetAura(*i, 0)) // should we check all 3 effects ?
+            if (pTemp->m_procCharges > 0) // Aura has been refreshed after adding to removedSpells
+            {
+                removedSpells.erase(i);
+                continue;
+            }
             RemoveAurasDueToSpell(*i);
+        }
     }
     --m_procDeep;
 }
