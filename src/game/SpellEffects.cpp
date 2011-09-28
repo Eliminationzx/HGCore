@@ -2657,7 +2657,7 @@ void Spell::EffectTriggerMissileSpell(uint32 effect_idx)
 
 void Spell::EffectTeleportUnits(uint32 i)
 {
-    if (!unitTarget || unitTarget->isInFlight())
+    if (!unitTarget || unitTarget->IsTaxiFlying())
         return;
 
     // If not exist data for dest location - return
@@ -4467,7 +4467,7 @@ void Spell::EffectTeleUnitsFaceCaster(uint32 i)
     if (!unitTarget)
         return;
 
-    if (unitTarget->isInFlight())
+    if (unitTarget->IsTaxiFlying())
         return;
 
     uint32 mapid = m_caster->GetMapId();
@@ -6017,9 +6017,50 @@ void Spell::EffectScriptEffect(uint32 effIndex)
 
             break;
         }
+        case 42924:
+        {
+            Aura* aur = m_caster->GetAura(42924, 0);
+            if(aur && aur->GetStackAmount() < 4)
+                break;
+
+            if(aur && aur->GetStackAmount() == 11)
+            {
+                m_caster->CastSpell(m_caster, 42936, true);
+                break;
+            }
+
+            if(m_caster->HasAura(42993, 2))
+            {
+                m_caster->RemoveAurasDueToSpell(42993);
+                m_caster->CastSpell(m_caster, 42994, true);
+            }
+            else if(m_caster->HasAura(42992, 2))
+            {
+                m_caster->RemoveAurasDueToSpell(42992);
+                m_caster->CastSpell(m_caster, 42993, true);
+            }
+            else if(m_caster->HasAura(43310, 2))
+            {
+                m_caster->RemoveAurasDueToSpell(43310);
+                m_caster->CastSpell(m_caster, 42992, true);
+            }
+            break;
+        }
         case 51508:
         {
             m_caster->HandleEmoteCommand(EMOTE_STATE_DANCE);
+            break;
+        }
+        case 42436:
+        {
+            switch(unitTarget->GetEntry())
+            {
+            case 24108:
+                ((Player*)m_caster)->CastedCreatureOrGO(unitTarget->GetEntry(), unitTarget->GetGUID(), 0);
+                break;
+            default:
+                m_caster->Kill(unitTarget, false);
+            }
             break;
         }
     }
@@ -6443,7 +6484,7 @@ void Spell::EffectStuck(uint32 /*i*/)
     sLog.outDebug("Spell Effect: Stuck");
     sLog.outDetail("Player %s (guid %u) used auto-unstuck future at map %u (%f, %f, %f)", pTarget->GetName(), pTarget->GetGUIDLow(), m_caster->GetMapId(), m_caster->GetPositionX(), pTarget->GetPositionY(), pTarget->GetPositionZ());
 
-    if (pTarget->isInFlight())
+    if (pTarget->IsTaxiFlying())
         return;
 
     // homebind location is loaded always
@@ -6815,8 +6856,8 @@ void Spell::EffectAddExtraAttacks(uint32 /*i*/)
     if (!unitTarget || !unitTarget->isAlive())
         return;
 
-    //if(unitTarget->m_extraAttacks)
-    //    return;
+    if (unitTarget->m_extraAttacks)
+        return;
 
     Unit *victim = unitTarget->getVictim();
 
@@ -6825,22 +6866,14 @@ void Spell::EffectAddExtraAttacks(uint32 /*i*/)
     if (!victim || !unitTarget->IsWithinMeleeRange(victim) || !unitTarget->HasInArc(2*M_PI/3, victim))
         return;
 
-    if (unitTarget->m_currentSpells[CURRENT_MELEE_SPELL])
-        unitTarget->m_currentSpells[CURRENT_MELEE_SPELL]->cast();
-
     // Only for proc/log informations
     unitTarget->m_extraAttacks = damage;
+
     // Need to send log before attack is made
     SendLogExecute();
     m_needSpellLog = false;
 
-    unitTarget->resetAttackTimer(BASE_ATTACK);
-
-    MeleeDamageLog damageInfo(unitTarget, victim, SPELL_SCHOOL_MASK_NORMAL, BASE_ATTACK);
-    unitTarget->CalculateMeleeDamage(&damageInfo);
-
-    unitTarget->DealMeleeDamage(&damageInfo, true);
-    unitTarget->ProcDamageAndSpell(damageInfo.target, damageInfo.procAttacker, damageInfo.procVictim, damageInfo.procEx, damageInfo.damage, damageInfo.attackType, m_spellInfo);
+    unitTarget->HandleProcExtraAttackFor(victim);
 }
 
 void Spell::EffectParry(uint32 /*i*/)
@@ -6861,7 +6894,7 @@ void Spell::EffectBlock(uint32 /*i*/)
 
 void Spell::EffectLeapForward(uint32 i)
 {
-    if (unitTarget->isInFlight())
+    if (unitTarget->IsTaxiFlying())
         return;
 
     if (m_spellInfo->rangeIndex== 1)                        //self range
@@ -6923,7 +6956,7 @@ void Spell::EffectLeapForward(uint32 i)
 }
 void Spell::EffectLeapBack(uint32 i)
 {
-    if (unitTarget->isInFlight())
+    if (unitTarget->IsTaxiFlying())
         return;
 
     m_caster->KnockBackFrom(unitTarget,float(m_spellInfo->EffectMiscValue[i])/10,float(damage)/10);
@@ -7057,7 +7090,7 @@ void Spell::EffectCharge2(uint32 /*i*/)
     else
         return;
 
-    m_caster->SendMonsterMoveWithSpeed(x, y, z, SPLINEFLAG_WALKMODE_MODE);
+    m_caster->SendMonsterMoveWithSpeed(x, y, z, MOVEFLAG_WALK_MODE);
     m_caster->Relocate(x, y, z);
 
     // not all charge effects used in negative spells

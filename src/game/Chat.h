@@ -107,7 +107,6 @@ class ChatHandler
         bool HandleAccountGuildAnnToggleCommand(const char* args);
 
         bool HandleHelpCommand(const char* args);
-        bool HandleAHBotOptionsCommand(const char * args);
         bool HandleCommandsCommand(const char* args);
         bool HandleStartCommand(const char* args);
         bool HandleDismountCommand(const char* args);
@@ -492,8 +491,6 @@ class ChatHandler
         bool HandleSendChannelNotifyCommand(const char* args);
         bool HandleSendChatMsgCommand(const char* args);
         bool HandleRenameCommand(const char * args);
-        bool HandleLoadPDumpCommand(const char *args);
-        bool HandleWritePDumpCommand(const char *args);
         bool HandleCastCommand(const char *args);
         bool HandleCastBackCommand(const char *args);
         bool HandleCastDistCommand(const char *args);
@@ -558,6 +555,8 @@ class ChatHandler
         bool HandleBanHelper(BanMode mode,char const* args);
         bool HandleBanInfoHelper(uint32 accountid, char const* accountname);
         bool HandleUnBanHelper(BanMode mode,char const* args);
+
+        void ShowItemListHelper(uint32 itemId, int loc_idx);//, Player* target = NULL);
 
         void SetSentErrorMessage(bool val){ sentErrorMessage = val;};
     private:

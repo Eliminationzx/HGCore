@@ -161,15 +161,14 @@ bool ChatHandler::HandleGuildAnnounceCommand(const char *args)
 
             if (pGuild->GetMemberSize() < 10)
             {
-                PSendSysMessage("Your guild is to small, you need at least 10 member to append guild announce.");
+                PSendSysMessage("Your guild is to small, you need at least 10 members to append guild announce.");
                 return false;
             }
 
-            PSendSysMessage("Your message has been queued and will be displayed soon, please wait: %u seconds to be able to send next message", sWorld.getConfig(CONFIG_GUILD_ANN_COOLDOWN));
-            
-            objmgr.SetGuildAnnCooldown(gId);
-            WorldDatabase.PExecute("REPLACE INTO guildann_cooldown VALUES ('%u', "UI64FMTD")", gId, objmgr.GetGuildAnnCooldown(gId));
-            sLog.outGann("Player %s ("UI64FMTD") - guild: %s (%u) append guild announce: %s", m_session->GetPlayer()->GetName(), m_session->GetPlayer()->GetGUID(), pGuild->GetName(), gId, msg.c_str());
+            PSendSysMessage("Your message has been queued and will be displayed soon, please wait: %u seconds before sending another one.", sWorld.getConfig(CONFIG_GUILD_ANN_COOLDOWN));
+
+            objmgr.SaveGuildAnnCooldown(gId);
+            sLog.outGann("Player %s ("UI64FMTD") - guild: %s (%u) append guild announce: %s", m_session->GetPlayer()->GetName(), m_session->GetPlayer()->GetGUID(), pGuild->GetName().c_str(), gId, msg.c_str());
             sWorld.QueueGuildAnnounce(gId, m_session->GetPlayer()->GetTeam(), msg);
             return true;
         }
@@ -180,7 +179,7 @@ bool ChatHandler::HandleGuildAnnounceCommand(const char *args)
         }
     }
 
-    PSendSysMessage("Your need to be in guild to append guild announce.");
+    PSendSysMessage("You need to be in guild to append guild announce.");
     return false;
 }
 
@@ -991,7 +990,7 @@ bool ChatHandler::HandleNamegoCommand(const char* args)
             ChatHandler(target).PSendSysMessage(LANG_SUMMONED_BY, GetName());
 
         // stop flight if need
-        if (target->isInFlight())
+        if (target->IsTaxiFlying())
         {
             target->GetMotionMaster()->MovementExpired();
             target->CleanupAfterTaxiFlight();
@@ -1120,7 +1119,7 @@ bool ChatHandler::HandleGonameCommand(const char* args)
             ChatHandler(target).PSendSysMessage(LANG_APPEARING_TO, _player->GetName());
 
         // stop flight if need
-        if (_player->isInFlight())
+        if (_player->IsTaxiFlying())
         {
             _player->GetMotionMaster()->MovementExpired();
             _player->CleanupAfterTaxiFlight();
@@ -1148,7 +1147,7 @@ bool ChatHandler::HandleGonameCommand(const char* args)
         if (Player::LoadPositionFromDB(map,x,y,z,o,in_flight,guid))
         {
             // stop flight if need
-            if (_player->isInFlight())
+            if (_player->IsTaxiFlying())
             {
                 _player->GetMotionMaster()->MovementExpired();
                 _player->CleanupAfterTaxiFlight();
@@ -1208,7 +1207,7 @@ bool ChatHandler::HandleRecallCommand(const char* args)
     }
 
     // stop flight if need
-    if (chr->isInFlight())
+    if (chr->IsTaxiFlying())
     {
         chr->GetMotionMaster()->MovementExpired();
         chr->CleanupAfterTaxiFlight();
@@ -1646,7 +1645,7 @@ bool ChatHandler::HandleModifyASpeedCommand(const char* args)
         return false;
     }
 
-    if (chr->isInFlight())
+    if (chr->IsTaxiFlying())
     {
         PSendSysMessage(LANG_CHAR_IN_FLIGHT,chr->GetName());
         SetSentErrorMessage(true);
@@ -1688,7 +1687,7 @@ bool ChatHandler::HandleModifySpeedCommand(const char* args)
         return false;
     }
 
-    if (chr->isInFlight())
+    if (chr->IsTaxiFlying())
     {
         PSendSysMessage(LANG_CHAR_IN_FLIGHT,chr->GetName());
         SetSentErrorMessage(true);
@@ -1727,7 +1726,7 @@ bool ChatHandler::HandleModifySwimCommand(const char* args)
         return false;
     }
 
-    if (chr->isInFlight())
+    if (chr->IsTaxiFlying())
     {
         PSendSysMessage(LANG_CHAR_IN_FLIGHT,chr->GetName());
         SetSentErrorMessage(true);
@@ -1766,7 +1765,7 @@ bool ChatHandler::HandleModifyBWalkCommand(const char* args)
         return false;
     }
 
-    if (chr->isInFlight())
+    if (chr->IsTaxiFlying())
     {
         PSendSysMessage(LANG_CHAR_IN_FLIGHT,chr->GetName());
         SetSentErrorMessage(true);
@@ -2255,7 +2254,7 @@ bool ChatHandler::HandleTeleCommand(const char * args)
     }
 
     // stop flight if need
-    if (_player->isInFlight())
+    if (_player->IsTaxiFlying())
     {
         _player->GetMotionMaster()->MovementExpired();
         _player->CleanupAfterTaxiFlight();
@@ -2464,17 +2463,15 @@ bool ChatHandler::SendGMMail(const char* pName, const char* msgSubject, const ch
         return false;
     }
 
-    uint32 mailId = objmgr.GenerateMailID();
     // from console show not existed sender
-    uint32 sender_guidlo = m_session ? m_session->GetPlayer()->GetGUIDLow() : 0;
+    MailSender sender(MAIL_NORMAL, m_session ? m_session->GetPlayer()->GetGUIDLow() : 0, MAIL_STATIONERY_GM);
 
-    uint32 messagetype = MAIL_NORMAL;
-    uint32 stationery = MAIL_STATIONERY_GM;
     uint32 itemTextId = !text.empty() ? objmgr.CreateItemText(text) : 0;
 
     Player *receiver = objmgr.GetPlayer(receiver_guid);
 
-    WorldSession::SendMailTo(receiver,messagetype, stationery, sender_guidlo, GUID_LOPART(receiver_guid), subject, itemTextId, NULL, 0, 0, MAIL_CHECK_MASK_NONE);
+    MailDraft(subject, itemTextId)
+        .SendMailTo(MailReceiver(receiver, ObjectGuid(receiver_guid)), sender);
 
     PSendSysMessage(LANG_MAIL_SENT, name.c_str());
 
@@ -2589,7 +2586,7 @@ bool ChatHandler::HandleNameTeleCommand(const char * args)
             ChatHandler(chr).PSendSysMessage(LANG_TELEPORTED_TO_BY, GetName());
 
         // stop flight if need
-        if (chr->isInFlight())
+        if (chr->IsTaxiFlying())
         {
             chr->GetMotionMaster()->MovementExpired();
             chr->CleanupAfterTaxiFlight();
@@ -2667,7 +2664,7 @@ bool ChatHandler::HandleGroupTeleCommand(const char * args)
             ChatHandler(pl).PSendSysMessage(LANG_TELEPORTED_TO_BY, GetName());
 
         // stop flight if need
-        if (pl->isInFlight())
+        if (pl->IsTaxiFlying())
         {
             pl->GetMotionMaster()->MovementExpired();
             pl->CleanupAfterTaxiFlight();
@@ -2760,7 +2757,7 @@ bool ChatHandler::HandleGroupgoCommand(const char* args)
             ChatHandler(pl).PSendSysMessage(LANG_SUMMONED_BY, GetName());
 
         // stop flight if need
-        if (pl->isInFlight())
+        if (pl->IsTaxiFlying())
         {
             pl->GetMotionMaster()->MovementExpired();
             pl->CleanupAfterTaxiFlight();
@@ -2808,7 +2805,7 @@ bool ChatHandler::HandleGoXYCommand(const char* args)
     }
 
     // stop flight if need
-    if (_player->isInFlight())
+    if (_player->IsTaxiFlying())
     {
         _player->GetMotionMaster()->MovementExpired();
         _player->CleanupAfterTaxiFlight();
@@ -2858,7 +2855,7 @@ bool ChatHandler::HandleGoXYZCommand(const char* args)
     }
 
     // stop flight if need
-    if (_player->isInFlight())
+    if (_player->IsTaxiFlying())
     {
         _player->GetMotionMaster()->MovementExpired();
         _player->CleanupAfterTaxiFlight();
@@ -2924,7 +2921,7 @@ bool ChatHandler::HandleGoZoneXYCommand(const char* args)
     }
 
     // stop flight if need
-    if (_player->isInFlight())
+    if (_player->IsTaxiFlying())
     {
         _player->GetMotionMaster()->MovementExpired();
         _player->CleanupAfterTaxiFlight();
@@ -2971,7 +2968,7 @@ bool ChatHandler::HandleGoGridCommand(const char* args)
     }
 
     // stop flight if need
-    if (_player->isInFlight())
+    if (_player->IsTaxiFlying())
     {
         _player->GetMotionMaster()->MovementExpired();
         _player->CleanupAfterTaxiFlight();

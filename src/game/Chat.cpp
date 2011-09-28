@@ -416,13 +416,6 @@ ChatCommand * ChatHandler::getCommandTable()
         { NULL,             0,                  false, NULL,                                            "", NULL }
     };
 
-    static ChatCommand pdumpCommandTable[] =
-    {
-        { "load",           SEC_ADMINISTRATOR,  true,  &ChatHandler::HandleLoadPDumpCommand,            "", NULL },
-        { "write",          SEC_ADMINISTRATOR,  true,  &ChatHandler::HandleWritePDumpCommand,           "", NULL },
-        { NULL,             0,                  false, NULL,                                            "", NULL }
-    };
-
     static ChatCommand listCommandTable[] =
     {
         { "creature",       SEC_ADMINISTRATOR,  true,  &ChatHandler::HandleListCreatureCommand,         "", NULL },
@@ -588,7 +581,6 @@ ChatCommand * ChatHandler::getCommandTable()
         { "reload",         SEC_ADMINISTRATOR,  true,  NULL,                                            "", reloadCommandTable },
         { "list",           SEC_ADMINISTRATOR,  true,  NULL,                                            "", listCommandTable },
         { "lookup",         SEC_ADMINISTRATOR,  true,  NULL,                                            "", lookupCommandTable },
-        { "pdump",          SEC_ADMINISTRATOR,  true,  NULL,                                            "", pdumpCommandTable },
         { "guild",          SEC_ADMINISTRATOR,  true,  NULL,                                            "", guildCommandTable },
         { "cast",           SEC_ADMINISTRATOR,  false, NULL,                                            "", castCommandTable },
         { "reset",          SEC_ADMINISTRATOR,  false, NULL,                                            "", resetCommandTable },
@@ -663,7 +655,6 @@ ChatCommand * ChatHandler::getCommandTable()
         { "cometome",       SEC_ADMINISTRATOR,  false, &ChatHandler::HandleComeToMeCommand,             "", NULL },
         { "damage",         SEC_ADMINISTRATOR,  false, &ChatHandler::HandleDamageCommand,               "", NULL },
         { "combatstop",     SEC_GAMEMASTER,     false, &ChatHandler::HandleCombatStopCommand,           "", NULL },
-        { "ahbotoptions",   SEC_ADMINISTRATOR,  true,  &ChatHandler::HandleAHBotOptionsCommand,         "", NULL },
         { "flusharenapoints",    SEC_ADMINISTRATOR, false, &ChatHandler::HandleFlushArenaPointsCommand, "",   NULL },
         { "chardelete",     SEC_CONSOLE,        true,  &ChatHandler::HandleCharacterDeleteCommand,      "", NULL },
         { "sendmessage",    SEC_ADMINISTRATOR,  true,  &ChatHandler::HandleSendMessageCommand,          "", NULL },

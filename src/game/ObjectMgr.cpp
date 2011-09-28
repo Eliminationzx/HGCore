@@ -288,7 +288,7 @@ void ObjectMgr::LoadCreatureLocales()
 
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
 
         bar.step();
 
@@ -297,7 +297,7 @@ void ObjectMgr::LoadCreatureLocales()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     do
     {
@@ -354,7 +354,7 @@ void ObjectMgr::LoadNpcOptionLocales()
 
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
 
         bar.step();
 
@@ -363,7 +363,7 @@ void ObjectMgr::LoadNpcOptionLocales()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     do
     {
@@ -810,7 +810,7 @@ void ObjectMgr::LoadCreatureLinkedRespawn()
 
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
 
         bar.step();
 
@@ -819,7 +819,7 @@ void ObjectMgr::LoadCreatureLinkedRespawn()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     do
     {
@@ -866,7 +866,7 @@ void ObjectMgr::LoadUnqueuedAccountList()
 
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
 
         bar.step();
 
@@ -875,7 +875,7 @@ void ObjectMgr::LoadUnqueuedAccountList()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     do
     {
@@ -910,7 +910,7 @@ void ObjectMgr::LoadCreatures()
 
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
 
         bar.step();
 
@@ -926,7 +926,7 @@ void ObjectMgr::LoadCreatures()
             if (cInfo->HeroicEntry)
                 heroicCreatures.insert(cInfo->HeroicEntry);
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     do
     {
@@ -1164,7 +1164,7 @@ void ObjectMgr::LoadGameobjects()
 
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
 
         bar.step();
 
@@ -1173,7 +1173,7 @@ void ObjectMgr::LoadGameobjects()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     do
     {
@@ -1268,7 +1268,7 @@ void ObjectMgr::LoadCreatureRespawnTimes()
 
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
 
         bar.step();
 
@@ -1277,7 +1277,7 @@ void ObjectMgr::LoadCreatureRespawnTimes()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     do
     {
@@ -1305,7 +1305,7 @@ void ObjectMgr::LoadGuildAnnCooldowns()
 
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
 
         bar.step();
 
@@ -1314,7 +1314,7 @@ void ObjectMgr::LoadGuildAnnCooldowns()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     do
     {
@@ -1344,7 +1344,7 @@ void ObjectMgr::LoadGameobjectRespawnTimes()
 
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
 
         bar.step();
 
@@ -1353,7 +1353,7 @@ void ObjectMgr::LoadGameobjectRespawnTimes()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     do
     {
@@ -1423,6 +1423,13 @@ uint32 ObjectMgr::GetPlayerTeamByGUID(const uint64 &guid) const
 
 uint32 ObjectMgr::GetPlayerAccountIdByGUID(const uint64 &guid) const
 {
+    if (!IS_PLAYER_GUID(guid))
+        return 0;
+
+    // prevent DB access for online player
+    if(Player* player = GetPlayer(guid))
+        return player->GetSession()->GetAccountId();
+
     QueryResultAutoPtr result = CharacterDatabase.PQuery("SELECT account FROM characters WHERE guid = '%u'", GUID_LOPART(guid));
     if (result)
     {
@@ -1453,7 +1460,7 @@ void ObjectMgr::LoadItemLocales()
 
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
 
         bar.step();
 
@@ -1462,7 +1469,7 @@ void ObjectMgr::LoadItemLocales()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     do
     {
@@ -1835,7 +1842,7 @@ void ObjectMgr::LoadPetLevelInfo()
 
         if (!result)
         {
-            barGoLink bar(1);
+            BarGoLink bar(1);
 
             sLog.outString();
             sLog.outString(">> Loaded %u level pet stats definitions", count);
@@ -1843,7 +1850,7 @@ void ObjectMgr::LoadPetLevelInfo()
             return;
         }
 
-        barGoLink bar(result->GetRowCount());
+        BarGoLink bar(result->GetRowCount());
 
         do
         {
@@ -1944,7 +1951,7 @@ void ObjectMgr::LoadPlayerInfo()
 
         if (!result)
         {
-            barGoLink bar(1);
+            BarGoLink bar(1);
 
             sLog.outString();
             sLog.outString(">> Loaded %u player create definitions", count);
@@ -1952,7 +1959,7 @@ void ObjectMgr::LoadPlayerInfo()
             exit(1);
         }
 
-        barGoLink bar(result->GetRowCount());
+        BarGoLink bar(result->GetRowCount());
 
         do
         {
@@ -2033,7 +2040,7 @@ void ObjectMgr::LoadPlayerInfo()
 
         if (!result)
         {
-            barGoLink bar(1);
+            BarGoLink bar(1);
 
             bar.step();
 
@@ -2042,7 +2049,7 @@ void ObjectMgr::LoadPlayerInfo()
         }
         else
         {
-            barGoLink bar(result->GetRowCount());
+            BarGoLink bar(result->GetRowCount());
 
             do
             {
@@ -2105,7 +2112,7 @@ void ObjectMgr::LoadPlayerInfo()
 
         if (!result)
         {
-            barGoLink bar(1);
+            BarGoLink bar(1);
 
             sLog.outString();
             sLog.outString(">> Loaded %u player create spells", count);
@@ -2113,7 +2120,7 @@ void ObjectMgr::LoadPlayerInfo()
         }
         else
         {
-            barGoLink bar(result->GetRowCount());
+            BarGoLink bar(result->GetRowCount());
 
             do
             {
@@ -2155,7 +2162,7 @@ void ObjectMgr::LoadPlayerInfo()
 
         if (!result)
         {
-            barGoLink bar(1);
+            BarGoLink bar(1);
 
             sLog.outString();
             sLog.outString(">> Loaded %u player create actions", count);
@@ -2163,7 +2170,7 @@ void ObjectMgr::LoadPlayerInfo()
         }
         else
         {
-            barGoLink bar(result->GetRowCount());
+            BarGoLink bar(result->GetRowCount());
 
             do
             {
@@ -2208,7 +2215,7 @@ void ObjectMgr::LoadPlayerInfo()
 
         if (!result)
         {
-            barGoLink bar(1);
+            BarGoLink bar(1);
 
             sLog.outString();
             sLog.outString(">> Loaded %u level health/mana definitions", count);
@@ -2216,7 +2223,7 @@ void ObjectMgr::LoadPlayerInfo()
             exit(1);
         }
 
-        barGoLink bar(result->GetRowCount());
+        BarGoLink bar(result->GetRowCount());
 
         do
         {
@@ -2294,7 +2301,7 @@ void ObjectMgr::LoadPlayerInfo()
 
         if (!result)
         {
-            barGoLink bar(1);
+            BarGoLink bar(1);
 
             sLog.outString();
             sLog.outString(">> Loaded %u level stats definitions", count);
@@ -2302,7 +2309,7 @@ void ObjectMgr::LoadPlayerInfo()
             exit(1);
         }
 
-        barGoLink bar(result->GetRowCount());
+        BarGoLink bar(result->GetRowCount());
 
         do
         {
@@ -2513,7 +2520,7 @@ void ObjectMgr::LoadGuilds()
     if (!result)
     {
 
-        barGoLink bar(1);
+        BarGoLink bar(1);
 
         bar.step();
 
@@ -2522,7 +2529,7 @@ void ObjectMgr::LoadGuilds()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     do
     {
@@ -2555,7 +2562,7 @@ void ObjectMgr::LoadArenaTeams()
     if (!result)
     {
 
-        barGoLink bar(1);
+        BarGoLink bar(1);
 
         bar.step();
 
@@ -2564,7 +2571,7 @@ void ObjectMgr::LoadArenaTeams()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     do
     {
@@ -2597,7 +2604,7 @@ void ObjectMgr::LoadGroups()
 
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
 
         bar.step();
 
@@ -2606,7 +2613,7 @@ void ObjectMgr::LoadGroups()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     do
     {
@@ -2636,12 +2643,12 @@ void ObjectMgr::LoadGroups()
     result = CharacterDatabase.Query("SELECT memberGuid, assistant, subgroup, leaderGuid FROM group_member ORDER BY leaderGuid");
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
         bar.step();
     }
     else
     {
-        barGoLink bar(result->GetRowCount());
+        BarGoLink bar(result->GetRowCount());
         do
         {
             bar.step();
@@ -2696,12 +2703,12 @@ void ObjectMgr::LoadGroups()
 
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
         bar.step();
     }
     else
     {
-        barGoLink bar(result->GetRowCount());
+        BarGoLink bar(result->GetRowCount());
         do
         {
             bar.step();
@@ -2776,7 +2783,7 @@ void ObjectMgr::LoadQuests()
 
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
         bar.step();
 
         sLog.outString();
@@ -2788,7 +2795,7 @@ void ObjectMgr::LoadQuests()
     // create multimap previous quest for each existed quest
     // some quests can have many previous maps set by NextQuestId in previous quest
     // for example set of race quests can lead to single not race specific quest
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
     do
     {
         bar.step();
@@ -3249,7 +3256,7 @@ void ObjectMgr::LoadQuestLocales()
 
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
 
         bar.step();
 
@@ -3258,7 +3265,7 @@ void ObjectMgr::LoadQuestLocales()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     do
     {
@@ -3374,7 +3381,7 @@ void ObjectMgr::LoadPetCreateSpells()
     QueryResultAutoPtr result = WorldDatabase.Query("SELECT entry, Spell1, Spell2, Spell3, Spell4 FROM petcreateinfo_spell");
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
         bar.step();
 
         sLog.outString();
@@ -3384,7 +3391,7 @@ void ObjectMgr::LoadPetCreateSpells()
     }
 
     uint32 count = 0;
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     mPetCreateSpell.clear();
 
@@ -3431,7 +3438,7 @@ void ObjectMgr::LoadScripts(ScriptMapMap& scripts, char const* tablename)
 
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
         bar.step();
 
         sLog.outString();
@@ -3439,7 +3446,7 @@ void ObjectMgr::LoadScripts(ScriptMapMap& scripts, char const* tablename)
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     do
     {
@@ -3725,23 +3732,9 @@ void ObjectMgr::LoadEventScripts()
     // Load all possible script entries from gameobjects
     for (uint32 i = 1; i < sGOStorage.MaxEntry; ++i)
     {
-        GameObjectInfo const * goInfo = sGOStorage.LookupEntry<GameObjectInfo>(i);
-        if (goInfo)
-        {
-            switch (goInfo->type)
-            {
-                case GAMEOBJECT_TYPE_GOOBER:
-                    if (goInfo->goober.eventId)
-                        evt_scripts.insert(goInfo->goober.eventId);
-                    break;
-                case GAMEOBJECT_TYPE_CHEST:
-                    if (goInfo->chest.eventId)
-                        evt_scripts.insert(goInfo->chest.eventId);
-                    break;
-                default:
-                    break;
-            }
-        }
+        if (GameObjectInfo const * goInfo = sGOStorage.LookupEntry<GameObjectInfo>(i))
+            if (uint32 eventId = goInfo->GetEventScriptId())
+                evt_scripts.insert(eventId);
     }
 
     // Load all possible script entries from spells
@@ -3758,6 +3751,20 @@ void ObjectMgr::LoadEventScripts()
                         evt_scripts.insert(spell->EffectMiscValue[j]);
                 }
             }
+        }
+    }
+
+    for (size_t path_idx = 0; path_idx < sTaxiPathNodesByPath.size(); ++path_idx)
+    {
+        for (size_t node_idx = 0; node_idx < sTaxiPathNodesByPath[path_idx].size(); ++node_idx)
+        {
+            TaxiPathNodeEntry const& node = sTaxiPathNodesByPath[path_idx][node_idx];
+
+            if (node.arrivalEventID)
+                evt_scripts.insert(node.arrivalEventID);
+
+            if (node.departureEventID)
+                evt_scripts.insert(node.departureEventID);
         }
     }
 
@@ -3790,7 +3797,7 @@ void ObjectMgr::LoadItemTexts()
     uint32 count = 0;
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
         bar.step();
 
         sLog.outString();
@@ -3798,7 +3805,7 @@ void ObjectMgr::LoadItemTexts()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     Field* fields;
     do
@@ -3868,7 +3875,7 @@ void ObjectMgr::LoadPageTextLocales()
     QueryResultAutoPtr result = WorldDatabase.Query("SELECT entry,text_loc1,text_loc2,text_loc3,text_loc4,text_loc5,text_loc6,text_loc7,text_loc8 FROM locales_page_text");
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
 
         bar.step();
 
@@ -3877,7 +3884,7 @@ void ObjectMgr::LoadPageTextLocales()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     do
     {
@@ -3987,7 +3994,7 @@ void ObjectMgr::LoadGossipText()
     int count = 0;
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
         bar.step();
 
         sLog.outString();
@@ -3997,7 +4004,7 @@ void ObjectMgr::LoadGossipText()
 
     int cic;
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     do
     {
@@ -4011,7 +4018,7 @@ void ObjectMgr::LoadGossipText()
         pGText = new GossipText;
         pGText->Text_ID    = fields[cic++].GetUInt32();
 
-        for (int i=0; i< 8; i++)
+        for (int i = 0; i < MAX_GOSSIP_TEXT_OPTIONS; i++)
         {
             pGText->Options[i].Text_0           = fields[cic++].GetCppString();
             pGText->Options[i].Text_1           = fields[cic++].GetCppString();
@@ -4061,7 +4068,7 @@ void ObjectMgr::LoadNpcTextLocales()
 
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
 
         bar.step();
 
@@ -4070,7 +4077,7 @@ void ObjectMgr::LoadNpcTextLocales()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     do
     {
@@ -4141,7 +4148,7 @@ void ObjectMgr::ReturnOrDeleteOldMails(bool serverUp)
         m->messageID = fields[0].GetUInt32();
         m->messageType = fields[1].GetUInt8();
         m->sender = fields[2].GetUInt32();
-        m->receiver = fields[3].GetUInt32();
+        m->receiverGuid = ObjectGuid(HIGHGUID_PLAYER, fields[3].GetUInt32());
         m->itemTextId = fields[4].GetUInt32();
         bool has_items = fields[5].GetBool();
         m->expire_time = (time_t)fields[6].GetUInt64();
@@ -4152,13 +4159,15 @@ void ObjectMgr::ReturnOrDeleteOldMails(bool serverUp)
 
         Player *pl = 0;
         if (serverUp)
-            pl = GetPlayer((uint64)m->receiver);
-        if (pl && pl->m_mailsLoaded)
+            pl = GetPlayer(m->receiverGuid.GetRawValue());
+
+        if (pl)
         {                                                   //this code will run very improbably (the time is between 4 and 5 am, in game is online a player, who has old mail
             //his in mailbox and he has already listed his mails)
             delete m;
             continue;
         }
+
         //delete or return mail:
         if (has_items)
         {
@@ -4177,7 +4186,7 @@ void ObjectMgr::ReturnOrDeleteOldMails(bool serverUp)
                 while (resultItems->NextRow());
             }
             //if it is mail from AH, it shouldn't be returned, but deleted
-            if (m->messageType != MAIL_NORMAL || (m->checked & (MAIL_CHECK_MASK_AUCTION | MAIL_CHECK_MASK_COD_PAYMENT | MAIL_CHECK_MASK_RETURNED)))
+            if (m->messageType != MAIL_NORMAL || (m->checked & (MAIL_CHECK_MASK_COD_PAYMENT | MAIL_CHECK_MASK_RETURNED)))
             {
                 // mail open and then not returned
                 for (std::vector<MailItemInfo>::iterator itr2 = m->items.begin(); itr2 != m->items.end(); ++itr2)
@@ -4186,7 +4195,7 @@ void ObjectMgr::ReturnOrDeleteOldMails(bool serverUp)
             else
             {
                 //mail will be returned:
-                CharacterDatabase.PExecute("UPDATE mail SET sender = '%u', receiver = '%u', expire_time = '" UI64FMTD "', deliver_time = '" UI64FMTD "',cod = '0', checked = '%u' WHERE id = '%u'", m->receiver, m->sender, (uint64)(basetime + 30*DAY), (uint64)basetime, MAIL_CHECK_MASK_RETURNED, m->messageID);
+                CharacterDatabase.PExecute("UPDATE mail SET sender = '%u', receiver = '%u', expire_time = '" UI64FMTD "', deliver_time = '" UI64FMTD "',cod = '0', checked = '%u' WHERE id = '%u'", m->receiverGuid.GetCounter(), m->sender, (uint64)(basetime + 30*DAY), (uint64)basetime, MAIL_CHECK_MASK_RETURNED, m->messageID);
                 for (std::vector<MailItemInfo>::iterator itr2 = m->items.begin(); itr2 != m->items.end(); ++itr2)
                 {
                     CharacterDatabase.PExecute("UPDATE mail_items SET receiver = %u WHERE item_guid = '%u'", m->sender, itr2->item_guid);
@@ -4217,7 +4226,7 @@ void ObjectMgr::LoadQuestAreaTriggers()
 
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
         bar.step();
 
         sLog.outString();
@@ -4225,7 +4234,7 @@ void ObjectMgr::LoadQuestAreaTriggers()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     do
     {
@@ -4280,7 +4289,7 @@ void ObjectMgr::LoadTavernAreaTriggers()
 
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
         bar.step();
 
         sLog.outString();
@@ -4288,7 +4297,7 @@ void ObjectMgr::LoadTavernAreaTriggers()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     do
     {
@@ -4322,7 +4331,7 @@ void ObjectMgr::LoadAreaTriggerScripts()
 
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
         bar.step();
 
         sLog.outString();
@@ -4330,7 +4339,7 @@ void ObjectMgr::LoadAreaTriggerScripts()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     do
     {
@@ -4355,7 +4364,7 @@ void ObjectMgr::LoadAreaTriggerScripts()
     sLog.outString(">> Loaded %u areatrigger scripts", count);
 }
 
-uint32 ObjectMgr::GetNearestTaxiNode(float x, float y, float z, uint32 mapid)
+uint32 ObjectMgr::GetNearestTaxiNode(float x, float y, float z, uint32 mapid, uint32 team)
 {
     bool found = false;
     float dist;
@@ -4364,23 +4373,34 @@ uint32 ObjectMgr::GetNearestTaxiNode(float x, float y, float z, uint32 mapid)
     for (uint32 i = 1; i < sTaxiNodesStore.GetNumRows(); ++i)
     {
         TaxiNodesEntry const* node = sTaxiNodesStore.LookupEntry(i);
-        if (node && node->map_id == mapid)
+        if (!node || node->map_id != mapid)
+            continue;
+
+        uint32 MountCreatureID = team == ALLIANCE ? node->alliance_mount_type : node->horde_mount_type;
+        if (!MountCreatureID)
+            continue;
+
+        uint8  field   = (uint8)((i - 1) / 32);
+        uint32 submask = 1<<((i-1)%32);
+
+        // skip not taxi network nodes
+        if ((sTaxiNodesMask[field] & submask)==0)
+            continue;
+
+        float dist2 = (node->x - x)*(node->x - x)+(node->y - y)*(node->y - y)+(node->z - z)*(node->z - z);
+        if (found)
         {
-            float dist2 = (node->x - x)*(node->x - x)+(node->y - y)*(node->y - y)+(node->z - z)*(node->z - z);
-            if (found)
+            if(dist2 < dist)
             {
-                if (dist2 < dist)
-                {
-                    dist = dist2;
-                    id = i;
-                }
-            }
-            else
-            {
-                found = true;
                 dist = dist2;
                 id = i;
             }
+        }
+        else
+        {
+            found = true;
+            dist = dist2;
+            id = i;
         }
     }
 
@@ -4447,46 +4467,6 @@ uint16 ObjectMgr::GetTaxiMount(uint32 id, uint32 team)
     return mount_id;
 }
 
-void ObjectMgr::GetTaxiPathNodes(uint32 path, Path &pathnodes, std::vector<uint32>& mapIds)
-{
-    if (path >= sTaxiPathNodesByPath.size())
-        return;
-
-    TaxiPathNodeList& nodeList = sTaxiPathNodesByPath[path];
-
-    pathnodes.Resize(nodeList.size());
-    mapIds.resize(nodeList.size());
-
-    for (size_t i = 0; i < nodeList.size(); ++i)
-    {
-        pathnodes[ i ].x = nodeList[i].x;
-        pathnodes[ i ].y = nodeList[i].y;
-        pathnodes[ i ].z = nodeList[i].z;
-
-        mapIds[i] = nodeList[i].mapid;
-    }
-}
-
-void ObjectMgr::GetTransportPathNodes(uint32 path, TransportPath &pathnodes)
-{
-    if (path >= sTaxiPathNodesByPath.size())
-        return;
-
-    TaxiPathNodeList& nodeList = sTaxiPathNodesByPath[path];
-
-    pathnodes.Resize(nodeList.size());
-
-    for (size_t i = 0; i < nodeList.size(); ++i)
-    {
-        pathnodes[ i ].mapid = nodeList[i].mapid;
-        pathnodes[ i ].x = nodeList[i].x;
-        pathnodes[ i ].y = nodeList[i].y;
-        pathnodes[ i ].z = nodeList[i].z;
-        pathnodes[ i ].actionFlag = nodeList[i].actionFlag;
-        pathnodes[ i ].delay = nodeList[i].delay;
-    }
-}
-
 void ObjectMgr::LoadGraveyardZones()
 {
     mGraveYardMap.clear();                                  // need for reload case
@@ -4497,7 +4477,7 @@ void ObjectMgr::LoadGraveyardZones()
 
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
         bar.step();
 
         sLog.outString();
@@ -4505,7 +4485,7 @@ void ObjectMgr::LoadGraveyardZones()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     do
     {
@@ -4758,7 +4738,7 @@ void ObjectMgr::LoadAreaTriggerTeleports()
     if (!result)
     {
 
-        barGoLink bar(1);
+        BarGoLink bar(1);
 
         bar.step();
 
@@ -4767,7 +4747,7 @@ void ObjectMgr::LoadAreaTriggerTeleports()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     do
     {
@@ -4827,7 +4807,7 @@ void ObjectMgr::LoadAccessRequirements()
     if (!result)
     {
 
-        barGoLink bar(1);
+        BarGoLink bar(1);
 
         bar.step();
 
@@ -4836,7 +4816,7 @@ void ObjectMgr::LoadAccessRequirements()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     do
     {
@@ -5150,7 +5130,7 @@ void ObjectMgr::LoadGameObjectLocales()
 
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
 
         bar.step();
 
@@ -5159,7 +5139,7 @@ void ObjectMgr::LoadGameObjectLocales()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     do
     {
@@ -5400,7 +5380,7 @@ void ObjectMgr::LoadExplorationBaseXP()
 
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
 
         bar.step();
 
@@ -5409,7 +5389,7 @@ void ObjectMgr::LoadExplorationBaseXP()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     do
     {
@@ -5439,7 +5419,7 @@ void ObjectMgr::LoadPetNames()
 
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
 
         bar.step();
 
@@ -5448,7 +5428,7 @@ void ObjectMgr::LoadPetNames()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     do
     {
@@ -5479,7 +5459,7 @@ void ObjectMgr::LoadPetNumber()
         m_hiPetNumber = fields[0].GetUInt32()+1;
     }
 
-    barGoLink bar(1);
+    BarGoLink bar(1);
     bar.step();
 
     sLog.outString();
@@ -5516,7 +5496,7 @@ void ObjectMgr::LoadCorpses()
 
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
 
         bar.step();
 
@@ -5525,7 +5505,7 @@ void ObjectMgr::LoadCorpses()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     do
     {
@@ -5564,7 +5544,7 @@ void ObjectMgr::LoadReputationOnKill()
 
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
 
         bar.step();
 
@@ -5573,7 +5553,7 @@ void ObjectMgr::LoadReputationOnKill()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     do
     {
@@ -5637,7 +5617,7 @@ void ObjectMgr::LoadWeatherZoneChances()
 
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
 
         bar.step();
 
@@ -5646,7 +5626,7 @@ void ObjectMgr::LoadWeatherZoneChances()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     do
     {
@@ -5697,6 +5677,13 @@ void ObjectMgr::SaveCreatureRespawnTime(uint32 loguid, uint32 instance, time_t t
     if (t)
         WorldDatabase.PExecute("INSERT INTO creature_respawn VALUES ('%u', '" UI64FMTD "', '%u')", loguid, uint64(t), instance);
     WorldDatabase.CommitTransaction();
+}
+
+void ObjectMgr::SaveGuildAnnCooldown(uint32 guild_id)
+{
+    time_t tmpTime = time_t(time(NULL) + sWorld.getConfig(CONFIG_GUILD_ANN_COOLDOWN));
+    mGuildCooldownTimes[guild_id] = tmpTime;
+    WorldDatabase.PExecute("REPLACE INTO guildann_cooldown VALUES ('%u', '"UI64FMTD"')", guild_id, uint64(tmpTime));
 }
 
 void ObjectMgr::DeleteCreatureData(uint32 guid)
@@ -5781,7 +5768,7 @@ void ObjectMgr::LoadQuestRelationsHelper(QuestRelations& map,char const* table)
 
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
 
         bar.step();
 
@@ -5790,7 +5777,7 @@ void ObjectMgr::LoadQuestRelationsHelper(QuestRelations& map,char const* table)
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     do
     {
@@ -5881,7 +5868,7 @@ void ObjectMgr::LoadReservedPlayersNames()
 
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
         bar.step();
 
         sLog.outString();
@@ -5889,7 +5876,7 @@ void ObjectMgr::LoadReservedPlayersNames()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     Field* fields;
     do
@@ -6066,7 +6053,7 @@ void ObjectMgr::LoadBattleMastersEntry()
 
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
         bar.step();
 
         sLog.outString();
@@ -6074,7 +6061,7 @@ void ObjectMgr::LoadBattleMastersEntry()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     do
     {
@@ -6180,7 +6167,7 @@ bool ObjectMgr::LoadTrinityStrings(DatabaseType& db, char const* table, int32 mi
 
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
 
         bar.step();
 
@@ -6194,7 +6181,7 @@ bool ObjectMgr::LoadTrinityStrings(DatabaseType& db, char const* table, int32 mi
 
     uint32 count = 0;
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     do
     {
@@ -6340,7 +6327,7 @@ void ObjectMgr::LoadSpellDisabledEntrys()
 
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
         bar.step();
 
         sLog.outString();
@@ -6348,7 +6335,7 @@ void ObjectMgr::LoadSpellDisabledEntrys()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     Field* fields;
     do
@@ -6384,7 +6371,7 @@ void ObjectMgr::LoadFishingBaseSkillLevel()
 
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
 
         bar.step();
 
@@ -6393,7 +6380,7 @@ void ObjectMgr::LoadFishingBaseSkillLevel()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     do
     {
@@ -6707,7 +6694,7 @@ void ObjectMgr::LoadGameTele()
 
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
 
         bar.step();
 
@@ -6716,7 +6703,7 @@ void ObjectMgr::LoadGameTele()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     do
     {
@@ -6840,7 +6827,7 @@ void ObjectMgr::LoadTrainerSpell()
 
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
 
         bar.step();
 
@@ -6849,7 +6836,7 @@ void ObjectMgr::LoadTrainerSpell()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     uint32 count = 0;
     do
@@ -6929,7 +6916,7 @@ void ObjectMgr::LoadVendors()
     QueryResultAutoPtr result = WorldDatabase.Query("SELECT entry, item, maxcount, incrtime, ExtendedCost FROM npc_vendor");
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
 
         bar.step();
 
@@ -6938,7 +6925,7 @@ void ObjectMgr::LoadVendors()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     uint32 count = 0;
     do
@@ -6974,7 +6961,7 @@ void ObjectMgr::LoadNpcTextId()
     QueryResultAutoPtr result = WorldDatabase.Query("SELECT npc_guid, textid FROM npc_gossip");
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
 
         bar.step();
 
@@ -6983,7 +6970,7 @@ void ObjectMgr::LoadNpcTextId()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     uint32 count = 0;
     uint32 guid,textid;
@@ -7027,7 +7014,7 @@ void ObjectMgr::LoadNpcOptions()
 
     if (!result)
     {
-        barGoLink bar(1);
+        BarGoLink bar(1);
 
         bar.step();
 
@@ -7036,7 +7023,7 @@ void ObjectMgr::LoadNpcOptions()
         return;
     }
 
-    barGoLink bar(result->GetRowCount());
+    BarGoLink bar(result->GetRowCount());
 
     uint32 count = 0;
 
@@ -7307,13 +7294,13 @@ void ObjectMgr::LoadTransportEvents()
 
     if (!result)
     {
-        barGoLink bar1(1);
+        BarGoLink bar1(1);
         bar1.step();
         sLog.outString("\n>> Transport events table is empty \n");
         return;
     }
 
-    barGoLink bar1(result->GetRowCount());
+    BarGoLink bar1(result->GetRowCount());
 
     do
     {
@@ -7334,3 +7321,80 @@ void ObjectMgr::LoadTransportEvents()
     sLog.outString("\n>> Loaded %u transport events \n", result->GetRowCount());
 }
 
+void ObjectMgr::GetCreatureLocaleStrings(uint32 entry, int32 loc_idx, char const** namePtr, char const** subnamePtr) const
+{
+    if (loc_idx >= 0)
+    {
+        if (CreatureLocale const *il = GetCreatureLocale(entry))
+        {
+            if (namePtr && il->Name.size() > size_t(loc_idx) && !il->Name[loc_idx].empty())
+                *namePtr = il->Name[loc_idx].c_str();
+
+            if (subnamePtr && il->SubName.size() > size_t(loc_idx) && !il->SubName[loc_idx].empty())
+                *subnamePtr = il->SubName[loc_idx].c_str();
+        }
+    }
+}
+
+void ObjectMgr::GetItemLocaleStrings(uint32 entry, int32 loc_idx, std::string* namePtr, std::string* descriptionPtr) const
+{
+    if (loc_idx >= 0)
+    {
+        if(ItemLocale const *il = GetItemLocale(entry))
+        {
+            if (namePtr && il->Name.size() > size_t(loc_idx) && !il->Name[loc_idx].empty())
+                *namePtr = il->Name[loc_idx];
+
+            if (descriptionPtr && il->Description.size() > size_t(loc_idx) && !il->Description[loc_idx].empty())
+                *descriptionPtr = il->Description[loc_idx];
+        }
+    }
+}
+
+void ObjectMgr::GetQuestLocaleStrings(uint32 entry, int32 loc_idx, std::string* titlePtr) const
+{
+    if (loc_idx >= 0)
+    {
+        if(QuestLocale const *il = GetQuestLocale(entry))
+        {
+            if (titlePtr && il->Title.size() > size_t(loc_idx) && !il->Title[loc_idx].empty())
+                *titlePtr = il->Title[loc_idx];
+        }
+    }
+}
+
+void ObjectMgr::GetNpcTextLocaleStringsAll(uint32 entry, int32 loc_idx, ObjectMgr::NpcTextArray* text0_Ptr, ObjectMgr::NpcTextArray* text1_Ptr) const
+{
+    if (loc_idx >= 0)
+    {
+        if (NpcTextLocale const *nl = GetNpcTextLocale(entry))
+        {
+            if (text0_Ptr)
+                for (int i = 0; i < MAX_GOSSIP_TEXT_OPTIONS; ++i)
+                    if (nl->Text_0[i].size() > (size_t)loc_idx && !nl->Text_0[i][loc_idx].empty())
+                        (*text0_Ptr)[i] = nl->Text_0[i][loc_idx];
+
+            if (text1_Ptr)
+                for (int i = 0; i < MAX_GOSSIP_TEXT_OPTIONS; ++i)
+                    if (nl->Text_1[i].size() > (size_t)loc_idx && !nl->Text_1[i][loc_idx].empty())
+                        (*text1_Ptr)[i] = nl->Text_1[i][loc_idx];
+        }
+    }
+}
+
+void ObjectMgr::GetNpcTextLocaleStrings0(uint32 entry, int32 loc_idx, std::string* text0_0_Ptr, std::string* text1_0_Ptr) const
+{
+    if (loc_idx >= 0)
+    {
+        if (NpcTextLocale const *nl = GetNpcTextLocale(entry))
+        {
+            if (text0_0_Ptr)
+                if (nl->Text_0[0].size() > (size_t)loc_idx && !nl->Text_0[0][loc_idx].empty())
+                    *text0_0_Ptr = nl->Text_0[0][loc_idx];
+
+            if (text1_0_Ptr)
+                if (nl->Text_1[0].size() > (size_t)loc_idx && !nl->Text_1[0][loc_idx].empty())
+                    *text1_0_Ptr = nl->Text_1[0][loc_idx];
+        }
+    }
+}

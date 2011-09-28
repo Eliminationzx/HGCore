@@ -96,7 +96,7 @@ void CreatureGroupManager::LoadCreatureFormations()
     }
 
     uint32 total_records = result->GetRowCount();
-    barGoLink bar(total_records);
+    BarGoLink bar(total_records);
     Field *fields;
 
     FormationInfo *group_member;
@@ -261,7 +261,7 @@ void CreatureGroup::LeaderMoveTo(float x, float y, float z)
             if (member->GetDistance(m_leader) > 40.0f)
                 member->Relocate(m_leader->GetPositionX(), m_leader->GetPositionY(), m_leader->GetPositionZ(), 0.0f);
             else
-                member->RemoveUnitMovementFlag(SPLINEFLAG_WALKMODE_MODE);
+                member->RemoveUnitMovementFlag(MOVEFLAG_WALK_MODE);
         }
 
         member->GetMotionMaster()->MovePoint(0, dx, dy, dz);

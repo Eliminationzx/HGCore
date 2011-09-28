@@ -174,7 +174,7 @@ void MovementInfo::Read(ByteBuffer &data)
         data >> t_time;
     }
 
-    if (HasMovementFlag(MovementFlags(MOVEFLAG_SWIMMING | SPLINEFLAG_FLYINGING2)))
+    if (HasMovementFlag(MovementFlags(MOVEFLAG_SWIMMING | MOVEFLAG_FLYING)))
         data >> s_pitch;
 
     data >> fallTime;
@@ -210,7 +210,7 @@ void MovementInfo::Write(ByteBuffer &data) const
         data << t_time;
     }
 
-    if (HasMovementFlag(MovementFlags(MOVEFLAG_SWIMMING | SPLINEFLAG_FLYINGING2)))
+    if (HasMovementFlag(MovementFlags(MOVEFLAG_SWIMMING | MOVEFLAG_FLYING)))
         data << s_pitch;
 
     data << fallTime;
@@ -546,14 +546,7 @@ void Unit::SendMonsterMove(float NewPosX, float NewPosY, float NewPosZ, uint32 M
     data << uint8(0);
     data << MoveFlags;
 
-    if (MoveFlags & SPLINEFLAG_JUMP)
-    {
-        data << time;
-        data << speedZ;
-        data << (uint32)0; // walk time after jump
-    }
-    else
-        data << time;
+    data << time;
 
     data << uint32(1);                                      // 1 single waypoint
     data << NewPosX << NewPosY << NewPosZ;                  // the single waypoint Point B
@@ -562,32 +555,6 @@ void Unit::SendMonsterMove(float NewPosX, float NewPosY, float NewPosZ, uint32 M
         player->GetSession()->SendPacket(&data);
     else
         SendMessageToSet(&data, true);
-}
-
-void Unit::SendMonsterMoveByPath(Path const& path, uint32 start, uint32 end)
-{
-    uint32 traveltime = uint32(path.GetTotalLength(start, end) * 32);
-
-    uint32 pathSize = end-start;
-
-    WorldPacket data(SMSG_MONSTER_MOVE, (GetPackGUID().size()+4+4+4+4+1+4+4+4+pathSize*4*3));
-    data << GetPackGUID();
-    data << GetPositionX();
-    data << GetPositionY();
-    data << GetPositionZ();
-
-    data << uint32(WorldTimer::getMSTime());
-
-    data << uint8(0);
-    data << uint32(((GetUnitMovementFlags() & MOVEFLAG_LEVITATING) || isInFlight())? (SPLINEFLAG_FLYING|SPLINEFLAG_WALKMODE) : SPLINEFLAG_WALKMODE);
-    data << uint32(traveltime);
-    data << uint32(pathSize);
-    data.append((char*)path.GetNodes(start), pathSize * 4 * 3);
-
-    //WPAssert(data.size() == 37 + pathnodes.Size() * 4 * 3);
-    SendMessageToSet(&data, true);
-
-    addUnitState(UNIT_STAT_MOVE);
 }
 
 void Unit::resetAttackTimer(WeaponAttackType type)
@@ -848,7 +815,7 @@ bool SpellCantDealDmgToPlayer(uint32 id)
 uint32 Unit::DealDamage(DamageLog *damageInfo, DamageEffectType damagetype, const SpellEntry *spellProto, bool durabilityLoss)
 {
     Unit *pVictim = damageInfo->target;
-    if (!pVictim->isAlive() || pVictim->isInFlight() || pVictim->GetTypeId() == TYPEID_UNIT && ((Creature*)pVictim)->IsInEvadeMode() || pVictim->HasAura(27827, 2))
+    if (!pVictim->isAlive() || pVictim->IsTaxiFlying() || pVictim->GetTypeId() == TYPEID_UNIT && ((Creature*)pVictim)->IsInEvadeMode() || pVictim->HasAura(27827, 2))
         return 0;
 
     //You don't lose health from damage taken from another player while in a sanctuary
@@ -1519,7 +1486,7 @@ void Unit::DealSpellDamage(SpellDamageLog *damageInfo, bool durabilityLoss)
     if (!this || !pVictim)
         return;
 
-    if (!pVictim->isAlive() || pVictim->isInFlight() || pVictim->GetTypeId() == TYPEID_UNIT && ((Creature*)pVictim)->IsInEvadeMode())
+    if (!pVictim->isAlive() || pVictim->IsTaxiFlying() || pVictim->GetTypeId() == TYPEID_UNIT && ((Creature*)pVictim)->IsInEvadeMode())
         return;
 
     SpellEntry const *spellProto = sSpellStore.LookupEntry(damageInfo->spell_id);
@@ -1642,7 +1609,7 @@ void Unit::DealMeleeDamage(MeleeDamageLog *damageInfo, bool durabilityLoss)
     if (!this || !pVictim)
         return;
 
-    if (!pVictim->isAlive() || pVictim->isInFlight() || pVictim->GetTypeId() == TYPEID_UNIT && ((Creature*)pVictim)->IsInEvadeMode())
+    if (!pVictim->isAlive() || pVictim->IsTaxiFlying() || pVictim->GetTypeId() == TYPEID_UNIT && ((Creature*)pVictim)->IsInEvadeMode())
         return;
 
     //You don't lose health from damage taken from another player while in a sanctuary
@@ -2183,7 +2150,7 @@ void Unit::AttackerStateUpdate (Unit *pVictim, WeaponAttackType attType, bool ex
         return;                                             // ignore ranged case
 
     // melee attack spell casted at main hand attack only
-    if (attType == BASE_ATTACK && m_currentSpells[CURRENT_MELEE_SPELL])
+    if (attType == BASE_ATTACK && m_currentSpells[CURRENT_MELEE_SPELL] && !extra)
     {
         m_currentSpells[CURRENT_MELEE_SPELL]->cast();
         return;
@@ -2217,14 +2184,19 @@ void Unit::AttackerStateUpdate (Unit *pVictim, WeaponAttackType attType, bool ex
 
     DealMeleeDamage(&damageInfo, true);
     ProcDamageAndSpell(damageInfo.target, damageInfo.procAttacker, damageInfo.procVictim, damageInfo.procEx, damageInfo.damage, damageInfo.attackType);
+}
 
-    if (GetTypeId() == TYPEID_PLAYER)
-        DEBUG_LOG("AttackerStateUpdate: (Player) %u attacked %u (TypeId: %u) for %u dmg, absorbed %u, blocked %u, resisted %u.",
-            GetGUIDLow(), pVictim->GetGUIDLow(), pVictim->GetTypeId(), damageInfo.damage, damageInfo.absorb, damageInfo.blocked, damageInfo.resist);
-    else
-        DEBUG_LOG("AttackerStateUpdate: (NPC)    %u attacked %u (TypeId: %u) for %u dmg, absorbed %u, blocked %u, resisted %u.",
-            GetGUIDLow(), pVictim->GetGUIDLow(), pVictim->GetTypeId(), damageInfo.damage, damageInfo.absorb, damageInfo.blocked, damageInfo.resist);
-
+void Unit::HandleProcExtraAttackFor(Unit* victim)
+{
+    if (m_extraAttacks)
+    {
+        while (m_extraAttacks)
+        {
+            AttackerStateUpdate(victim, BASE_ATTACK, true);
+            if (m_extraAttacks > 0)
+                --m_extraAttacks;
+        }
+    }
 }
 
 void Unit::RollMeleeHit(MeleeDamageLog *damageInfo) const
@@ -3500,9 +3472,9 @@ bool Unit::isBetween(WorldObject *s, WorldObject *e, float offset) const
 bool Unit::isInAccessiblePlacefor (Creature const* c) const
 {
     if (IsInWater())
-        return c->canSwim();
+        return c->CanSwim();
     else
-        return c->canWalk() || c->canFly();
+        return c->CanWalk() || c->CanFly();
 }
 
 bool Unit::IsInWater() const
@@ -9223,7 +9195,7 @@ bool Unit::isAttackableByAOE() const
     if (GetTypeId()==TYPEID_PLAYER && ((Player *)this)->isGameMaster())
         return false;
 
-    return !isInFlight();
+    return !IsTaxiFlying();
 }
 
 int32 Unit::ModifyHealth(int32 dVal)
@@ -11958,7 +11930,7 @@ void Unit::BuildHeartBeatMsg(WorldPacket *data) const
 {
     data->Initialize(MSG_MOVE_HEARTBEAT, 32);
     *data << GetPackGUID();
-    *data << uint32(((GetUnitMovementFlags() & MOVEFLAG_LEVITATING) || isInFlight())? (SPLINEFLAG_FLYING|SPLINEFLAG_WALKMODE) : GetUnitMovementFlags());
+    *data << uint32(((GetUnitMovementFlags() & MOVEFLAG_LEVITATING) || IsTaxiFlying())? (SPLINEFLAG_FLYING|SPLINEFLAG_WALKMODE) : GetUnitMovementFlags());
     *data << uint8(0);                                      // 2.3.0
     *data << uint32(WorldTimer::getMSTime());                           // time
     *data << float(GetPositionX());
@@ -12431,12 +12403,12 @@ void Unit::SetFlying(bool apply)
     if (apply)
     {
         SetByteFlag(UNIT_FIELD_BYTES_1, 3, 0x02);
-        AddUnitMovementFlag(SPLINEFLAG_FLYINGING + SPLINEFLAG_FLYINGING2);
+        AddUnitMovementFlag(SPLINEFLAG_FLYINGING + MOVEFLAG_FLYING);
     }
     else
     {
         RemoveByteFlag(UNIT_FIELD_BYTES_1, 3, 0x02);
-        RemoveUnitMovementFlag(SPLINEFLAG_FLYINGING + SPLINEFLAG_FLYINGING2);
+        RemoveUnitMovementFlag(SPLINEFLAG_FLYINGING + MOVEFLAG_FLYING);
     }
 }
 
@@ -12466,13 +12438,13 @@ void Unit::SetCharmedOrPossessedBy(Unit* charmer, bool possess)
     if (this == charmer)
         return;
 
-    if (isInFlight())
+    if (IsTaxiFlying())
         return;
 
     if (GetTypeId() == TYPEID_PLAYER && ((Player*)this)->GetTransport())
         return;
 
-    RemoveUnitMovementFlag(SPLINEFLAG_WALKMODE_MODE);
+    RemoveUnitMovementFlag(MOVEFLAG_WALK_MODE);
     CastStop();
     CombatStop(); //TODO: CombatStop(true) may cause crash (interrupt spells)
     DeleteThreatList();
