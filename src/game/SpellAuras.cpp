@@ -416,19 +416,7 @@ m_periodicTimer(0), m_amplitude(0), m_PeriodicEventId(0), m_AuraDRGroup(DIMINISH
 
     if (m_spellProto->procCharges)
     {
-        switch (m_spellProto->Id)
-        {
-            case 17794:
-            case 17797:
-            case 17798:
-            case 17799:
-            case 17800:
-                m_procCharges = m_spellProto->procCharges + 1;
-                break;
-            default:
-                m_procCharges = m_spellProto->procCharges;
-        }
-
+        m_procCharges = m_spellProto->procCharges;
         if (modOwner)
             modOwner->ApplySpellMod(GetId(), SPELLMOD_CHARGES, m_procCharges);
     }
@@ -581,25 +569,32 @@ void Aura::Update(uint32 diff)
                          GetTriggerTarget()) ? GetTriggerTarget() : m_target;
 
 
-    if (IsChanneledSpell(m_spellProto) && !pRealTarget->isPossessed() && pRealTarget->GetGUID() != GetCasterGUID())
+    if (IsChanneledSpell(m_spellProto))
     {
         Unit* caster = GetCaster();
-        if (!caster)
-        {
-            m_target->RemoveAura(GetId(),GetEffIndex());
-            return;
-        }
-        if (caster->GetUInt64Value(UNIT_FIELD_CHANNEL_OBJECT) == m_target->GetGUID())
-        {
-            float max_range = GetSpellMaxRange(sSpellRangeStore.LookupEntry(m_spellProto->rangeIndex));
 
-            if (Player* modOwner = caster->GetSpellModOwner())
-                modOwner->ApplySpellMod(GetId(), SPELLMOD_RANGE, max_range, NULL);
+        if(caster && !caster->m_currentSpells[CURRENT_CHANNELED_SPELL])
+            caster->RemoveAurasByCasterSpell(GetId(), caster->GetGUID());
 
-            if (!caster->IsWithinDistInMap(m_target, max_range))
+        if(!pRealTarget->isPossessed() && pRealTarget->GetGUID() != GetCasterGUID())
+        {
+            if (!caster)
             {
-                m_target->RemoveAura(GetId(), GetEffIndex());
+                m_target->RemoveAura(GetId(),GetEffIndex());
                 return;
+            }
+            if (caster->GetUInt64Value(UNIT_FIELD_CHANNEL_OBJECT) == m_target->GetGUID())
+            {
+                float max_range = GetSpellMaxRange(sSpellRangeStore.LookupEntry(m_spellProto->rangeIndex));
+
+                if (Player* modOwner = caster->GetSpellModOwner())
+                    modOwner->ApplySpellMod(GetId(), SPELLMOD_RANGE, max_range, NULL);
+
+                if (!caster->IsWithinDistInMap(m_target, max_range))
+                {
+                    m_target->RemoveAura(GetId(), GetEffIndex());
+                    return;
+                }
             }
         }
     }

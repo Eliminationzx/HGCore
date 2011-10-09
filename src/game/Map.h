@@ -496,10 +496,12 @@ class TRINITY_DLL_SPEC InstanceMap : public Map
         void SetResetSchedule(bool on);
         virtual void InitVisibilityDistance();
         uint32 GetMaxPlayers() const;
-
+        
+        void SummonUnlootedCreatures();
     private:
         bool m_resetAfterUnload;
         bool m_unloadWhenEmpty;
+        bool m_unlootedCreaturesSummoned;
         InstanceData* i_data;
         uint32 i_script_id;
 };
