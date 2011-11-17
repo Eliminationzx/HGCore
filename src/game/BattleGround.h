@@ -211,6 +211,11 @@ enum BattleGroundJoinError
     BG_JOIN_ERR_GROUP_NOT_ENOUGH = 9
 };
 
+enum ArenaSharedNPC
+{
+    ARENA_NPC_SPECTATOR = 0
+};
+
 class BattleGroundScore
 {
     public:
@@ -241,7 +246,7 @@ This class is used to:
 3. some certain cases, same for all battlegrounds
 4. It has properties same for all battlegrounds
 */
-class BattleGround
+class TRINITY_DLL_SPEC BattleGround
 {
     friend class BattleGroundMgr;
 
@@ -446,6 +451,7 @@ class BattleGround
         bool DelCreature(uint32 type);
         bool DelObject(uint32 type);
         bool AddSpiritGuide(uint32 type, float x, float y, float z, float o, uint32 team);
+        void AddSpectatorNPC(float x, float y, float z, float o);
         int32 GetObjectType(uint64 guid);
 
         void DoorOpen(uint32 type);
