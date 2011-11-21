@@ -52,6 +52,16 @@ class QueryResult;
 class WorldSocket;
 class AntiCheat;
 
+// ServerMessages.dbc
+enum ServerMessageType
+{
+    SERVER_MSG_SHUTDOWN_TIME      = 1,
+    SERVER_MSG_RESTART_TIME       = 2,
+    SERVER_MSG_STRING             = 3,
+    SERVER_MSG_SHUTDOWN_CANCELLED = 4,
+    SERVER_MSG_RESTART_CANCELLED  = 5
+};
+
 enum ShutdownMask
 {
     SHUTDOWN_MASK_RESTART = 1,
@@ -250,6 +260,7 @@ enum WorldConfigs
     CONFIG_CHAT_MINIMUM_LVL,
 
     CONFIG_ENABLE_HIDDEN_RATING,
+    CONFIG_ENABLE_FAKE_WHO_ON_ARENA,
 
     CONFIG_VMSS_MAXTHREADBREAKS,
     CONFIG_VMSS_TBREMTIME,
@@ -397,7 +408,7 @@ enum SpecialQuest
 #define SCRIPT_COMMAND_CAST_SPELL           15              // source (datalong2!=0) or target (datalong==0) unit, datalong = spell_id
 #define SCRIPT_COMMAND_LOAD_PATH            16              // source = unit, path = datalong, repeatable datalong2
 #define SCRIPT_COMMAND_CALLSCRIPT_TO_UNIT   17              // datalong scriptid, lowguid datalong2, dataint table
-#define SCRIPT_COMMAND_PLAYSOUND            18              // datalong soundid, datalong2 play only self
+#define SCRIPT_COMMAND_PLAY_SOUND           18              // source = any object, target=any/player, datalong (sound_id), datalong2 (bitmask: 0/1=anyone/target, 0/2=with distance dependent, so 1|2 = 3 is target with distance dependent)
 #define SCRIPT_COMMAND_KILL                 19              // datalong removecorpse
 
 
@@ -524,7 +535,7 @@ class World
         void SendGlobalGMMessage(WorldPacket *packet, WorldSession *self = 0, uint32 team = 0);
         void SendZoneMessage(uint32 zone, WorldPacket *packet, WorldSession *self = 0, uint32 team = 0);
         void SendZoneText(uint32 zone, const char *text, WorldSession *self = 0, uint32 team = 0);
-        void SendServerMessage(uint32 type, const char *text = "", Player* player = NULL);
+        void SendServerMessage(ServerMessageType type, const char *text = "", Player* player = NULL);
 
         /// Are we in the middle of a shutdown?
         bool IsShutdowning() const { return m_ShutdownTimer > 0; }

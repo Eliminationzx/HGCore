@@ -239,7 +239,7 @@ void ArenaTeam::LoadMembersFromDB(uint32 ArenaTeamId)
     QueryResultAutoPtr result = CharacterDatabase.PQuery("SELECT member.guid, played_week, wons_week, played_season, wons_season, personal_rating, name, class, rating2, rating3, rating5 "
                                                    "FROM arena_team_member member "
                                                    "INNER JOIN characters chars on member.guid = chars.guid "
-                                                   "JOIN hidden_rating hidden ON member.guid = hidden.guid"
+                                                   "JOIN hidden_rating hidden ON member.guid = hidden.guid "
                                                    "WHERE member.arenateamid = '%u'", ArenaTeamId);
     if (!result)
         return;
@@ -696,6 +696,8 @@ void ArenaTeam::SaveToDB()
     static SqlStatementID updateH3Rating;
     static SqlStatementID updateH5Rating;
 
+    CharacterDatabase.BeginTransaction();
+
     SqlStatement stmt = CharacterDatabase.CreateStatement(updateATeam, "UPDATE arena_team_stats SET rating = ?, games = ?, played = ?, rank = ?, wins = ?, wins2 = ? WHERE arenateamid = ?");
     stmt.addUInt32(stats.rating);
     stmt.addUInt32(stats.games_week);
@@ -742,6 +744,8 @@ void ArenaTeam::SaveToDB()
         stmt.addUInt32(itr->guid);
         stmt.Execute();
     }
+
+    CharacterDatabase.CommitTransaction();
 }
 
 void ArenaTeam::FinishWeek()
@@ -769,6 +773,19 @@ uint32 ArenaTeam::GetAverageMMR(Group *group) const
     matchmakerrating /= GetType();
 
     return matchmakerrating;
+}
+
+bool ArenaTeam::IsFighting() const
+{
+    for (MemberList::const_iterator itr = members.begin(); itr != members.end(); ++itr)
+    {
+        if (Player *p = objmgr.GetPlayer(itr->guid))
+        {
+            if (p->GetMap()->IsBattleArena())
+                return true;
+        }
+    }
+    return false;
 }
 
 /*

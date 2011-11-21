@@ -33,6 +33,7 @@
 #include "NPCHandler.h"
 #include "ObjectAccessor.h"
 #include "Pet.h"
+#include "MapManager.h"
 
 void WorldSession::SendNameQueryOpcode(Player *p)
 {
@@ -261,20 +262,44 @@ void WorldSession::HandleCorpseQueryOpcode(WorldPacket & /*recv_data*/)
 
     Corpse *corpse = GetPlayer()->GetCorpse();
 
-    uint8 found = 1;
     if (!corpse)
-        found = 0;
-
-    WorldPacket data(MSG_CORPSE_QUERY, (1+found*(5*4)));
-    data << uint8(found);
-    if (found)
     {
-        data << corpse->GetMapId();
-        data << corpse->GetPositionX();
-        data << corpse->GetPositionY();
-        data << corpse->GetPositionZ();
-        data << _player->GetMapId();
+        WorldPacket data(MSG_CORPSE_QUERY, 1);
+        data << uint8(0);                                   // corpse not found
+        SendPacket(&data);
+        return;
     }
+
+    int32 mapid = corpse->GetMapId();
+    float x = corpse->GetPositionX();
+    float y = corpse->GetPositionY();
+    float z = corpse->GetPositionZ();
+    int32 corpsemapid = _player->GetMapId();
+
+    if (Map *map = corpse->GetMap())
+    {
+        if (map->IsDungeon())
+        {
+            if (!map->GetEntrancePos(mapid, x, y))
+                return;
+
+            Map *entrance_map = MapManager::Instance().GetMap(mapid, _player);
+            if (!entrance_map)
+                return;
+
+            z = entrance_map->GetHeight(x, y, MAX_HEIGHT);
+            corpsemapid = corpse->GetMapId();
+        }
+    }
+
+    WorldPacket data(MSG_CORPSE_QUERY, 1+(5*4));
+    data << uint8(1);                                       // corpse found
+    data << int32(mapid);
+    data << float(x);
+    data << float(y);
+    data << float(z);
+    data << int32(corpsemapid);
+
     SendPacket(&data);
 }
 
@@ -284,8 +309,6 @@ void WorldSession::HandleNpcTextQueryOpcode(WorldPacket & recv_data)
 
     uint32 textID;
     uint64 guid;
-    GossipText *pGossip;
-    std::string GossipStr;
 
     recv_data >> textID;
     sLog.outDetail("WORLD: CMSG_NPC_TEXT_QUERY ID '%u'", textID);
@@ -293,7 +316,7 @@ void WorldSession::HandleNpcTextQueryOpcode(WorldPacket & recv_data)
     recv_data >> guid;
     GetPlayer()->SetUInt64Value(UNIT_FIELD_TARGET, guid);
 
-    pGossip = objmgr.GetGossipText(textID);
+    GossipText const* pGossip = objmgr.GetGossipText(textID);
 
     WorldPacket data(SMSG_NPC_TEXT_UPDATE, 100);          // guess size
     data << textID;
@@ -327,7 +350,7 @@ void WorldSession::HandleNpcTextQueryOpcode(WorldPacket & recv_data)
         sObjectMgr.GetNpcTextLocaleStringsAll(textID, loc_idx, &Text_0, &Text_1);
 
 
-        for (int i = 0; i < MAX_GOSSIP_TEXT_OPTIONS; ++i)
+        for (uint8 i = 0; i < MAX_GOSSIP_TEXT_OPTIONS; ++i)
         {
             data << pGossip->Options[i].Probability;
 
@@ -343,14 +366,11 @@ void WorldSession::HandleNpcTextQueryOpcode(WorldPacket & recv_data)
 
             data << pGossip->Options[i].Language;
 
-            data << pGossip->Options[i].Emotes[0]._Delay;
-            data << pGossip->Options[i].Emotes[0]._Emote;
-
-            data << pGossip->Options[i].Emotes[1]._Delay;
-            data << pGossip->Options[i].Emotes[1]._Emote;
-
-            data << pGossip->Options[i].Emotes[2]._Delay;
-            data << pGossip->Options[i].Emotes[2]._Emote;
+            for (uint8 j = 0; j < 3; ++j)
+            {
+                data << pGossip->Options[i].Emotes[j]._Delay;
+                data << pGossip->Options[i].Emotes[j]._Emote;
+            }
         }
     }
 

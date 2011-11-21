@@ -26,10 +26,12 @@
 #include "ObjectMgr.h"
 #include "MapManager.h"
 #include "Language.h"
+#include "WorldPacket.h"
 
 BattleGroundRL::BattleGroundRL()
 {
     m_BgObjects.resize(BG_RL_OBJECT_MAX);
+    m_BgCreatures.resize(BG_RL_CREATURE_MAX);
 }
 
 BattleGroundRL::~BattleGroundRL()
@@ -55,6 +57,8 @@ void BattleGroundRL::Update(uint32 diff)
                 EndNow();
                 return;
             }
+
+            //AddSpectatorNPC();
 
             for (uint32 i = BG_RL_OBJECT_DOOR_1; i <= BG_RL_OBJECT_DOOR_2; i++)
                 SpawnBGObject(i, RESPAWN_IMMEDIATELY);

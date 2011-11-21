@@ -257,7 +257,7 @@ bool ChatHandler::HandleGMNotifyCommand(const char* args)
 }
 
 //Enable\Dissable GM Mode
-bool ChatHandler::HandleGMmodeCommand(const char* args)
+bool ChatHandler::HandleGMCommand(const char* args)
 {
     if (!*args)
     {
@@ -800,7 +800,7 @@ bool ChatHandler::HandleGMTicketReloadCommand(const char*)
 }
 
 //Enable\Dissable Invisible mode
-bool ChatHandler::HandleVisibleCommand(const char* args)
+bool ChatHandler::HandleGMVisibleCommand(const char* args)
 {
     if (!*args)
     {
@@ -1130,7 +1130,7 @@ bool ChatHandler::HandleGonameCommand(const char* args)
 
         // to point to see at target with same orientation
         float x,y,z;
-        target->GetContactPoint(m_session->GetPlayer(),x,y,z);
+        target->GetPosition(x, y, z);
         _player->TeleportTo(target->GetMapId(), x, y, z, _player->GetAngle(target), TELE_TO_GM_MODE);
 
         return true;
@@ -2409,35 +2409,6 @@ bool ChatHandler::HandleWhispersCommand(const char* args)
     return false;
 }
 
-//Play sound
-bool ChatHandler::HandlePlaySoundCommand(const char* args)
-{
-    // USAGE: .debug playsound #soundid
-    // #soundid - ID decimal number from SoundEntries.dbc (1st column)
-    // this file have about 5000 sounds.
-    // In this realization only caller can hear this sound.
-    if (*args)
-    {
-        uint32 dwSoundId = atoi((char*)args);
-
-        if (!sSoundEntriesStore.LookupEntry(dwSoundId))
-        {
-            PSendSysMessage(LANG_SOUND_NOT_EXIST, dwSoundId);
-            SetSentErrorMessage(true);
-            return false;
-        }
-
-        WorldPacket data(SMSG_PLAY_OBJECT_SOUND,4+8);
-        data << uint32(dwSoundId) << m_session->GetPlayer()->GetGUID();
-        m_session->SendPacket(&data);
-
-        PSendSysMessage(LANG_YOU_HEAR_SOUND, dwSoundId);
-        return true;
-    }
-
-    return false;
-}
-
 bool ChatHandler::SendGMMail(const char* pName, const char* msgSubject, const char* msgText)
 {
     if (!pName || !msgSubject || !msgText)
@@ -2530,7 +2501,7 @@ bool ChatHandler::HandleSendMailCommand(const char* args)
 }
 
 // teleport player to given game_tele.entry
-bool ChatHandler::HandleNameTeleCommand(const char * args)
+bool ChatHandler::HandleTeleNameCommand(const char * args)
 {
     if (!*args)
         return false;
@@ -2609,7 +2580,7 @@ bool ChatHandler::HandleNameTeleCommand(const char * args)
 }
 
 //Teleport group to given game_tele.entry
-bool ChatHandler::HandleGroupTeleCommand(const char * args)
+bool ChatHandler::HandleTeleGroupCommand(const char * args)
 {
     if (!*args)
         return false;
@@ -2888,6 +2859,11 @@ bool ChatHandler::HandleGoZoneXYCommand(const char* args)
 
     float x = (float)atof(px);
     float y = (float)atof(py);
+
+    // prevent accept wrong numeric args
+    if (x==0.0f && *px!='0' || y==0.0f && *py!='0')
+        return false;
+
     uint32 areaid = cAreaId ? (uint32)atoi(cAreaId) : _player->GetZoneId();
 
     AreaTableEntry const* areaEntry = GetAreaEntryByAreaID(areaid);
@@ -2984,7 +2960,7 @@ bool ChatHandler::HandleGoGridCommand(const char* args)
     return true;
 }
 
-bool ChatHandler::HandleDrunkCommand(const char* args)
+bool ChatHandler::HandleModifyDrunkCommand(const char* args)
 {
     if (!*args)    return false;
 

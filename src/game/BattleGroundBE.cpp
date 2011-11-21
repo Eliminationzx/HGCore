@@ -25,11 +25,13 @@
 #include "Creature.h"
 #include "ObjectMgr.h"
 #include "MapManager.h"
+#include "WorldPacket.h"
 #include "Language.h"
 
 BattleGroundBE::BattleGroundBE()
 {
     m_BgObjects.resize(BG_BE_OBJECT_MAX);
+    m_BgCreatures.resize(BG_BE_CREATURE_MAX);
 }
 
 BattleGroundBE::~BattleGroundBE()

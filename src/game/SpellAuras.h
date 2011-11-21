@@ -317,7 +317,7 @@ class TRINITY_DLL_SPEC Aura
 
             if (GetSpellProto()->SpellFamilyName == SPELLFAMILY_PRIEST && GetSpellProto()->SpellFamilyFlags & 0x40000000000LL) // Vampiric Touch
                 return true;
-    
+
             if (GetSpellProto()->SpellFamilyName == SPELLFAMILY_SHAMAN && this->GetSpellProto()->SpellIconID == 1677) // Grounding Totem
                 return true;
 
@@ -396,6 +396,7 @@ class TRINITY_DLL_SPEC Aura
         bool m_in_use:1;                                    // true while in Aura::ApplyModifier call
         bool m_isSingleTargetAura:1;                        // true if it's a single target spell and registered at caster - can change at spell steal for example
 
+        int32 m_heartbeatTimer;
         int32 m_periodicTimer;
         int32 m_amplitude;
         uint32 m_PeriodicEventId;

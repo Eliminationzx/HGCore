@@ -21,6 +21,7 @@
 #include "Object.h"
 #include "Player.h"
 #include "BattleGround.h"
+#include "BattleGroundMgr.h"
 #include "Creature.h"
 #include "MapManager.h"
 #include "Language.h"
@@ -28,11 +29,14 @@
 #include "SpellAuras.h"
 #include "ArenaTeam.h"
 #include "World.h"
+#include "Group.h"
+#include "ObjectMgr.h"
+#include "WorldPacket.h"
 #include "Util.h"
 
 BattleGround::BattleGround()
 {
-    m_TypeID            = 0;
+    m_TypeID            = BattleGroundTypeId(0);
     m_InstanceID        = 0;
     m_Status            = 0;
     m_EndTime           = 0;
@@ -456,7 +460,7 @@ void BattleGround::RewardReputationToTeam(uint32 faction_id, uint32 Reputation, 
         if (team == TeamID)
         {
             int32 rep = plr->CalculateReputationGain(70, Reputation, faction_id, false);
-            plr->ModifyFactionReputation(factionEntry, rep);
+            plr->GetReputationMgr().ModifyReputation(factionEntry, Reputation);
             plr->UpdateBgTitle();
         }
     }
@@ -839,7 +843,7 @@ void BattleGround::RemovePlayerAtLeave(uint64 guid, bool Transport, bool SendPac
         {
             if (!team) team = plr->GetTeam();
 
-            uint32 bgTypeId = GetTypeID();
+            BattleGroundTypeId bgTypeId = GetTypeID();
             uint32 bgQueueTypeId = BattleGroundMgr::BGQueueTypeId(GetTypeID(), GetArenaType());
             // if arena, remove the specific arena auras
             if (isArena())
@@ -847,15 +851,9 @@ void BattleGround::RemovePlayerAtLeave(uint64 guid, bool Transport, bool SendPac
                 plr->RemoveArenaAuras(true);    // removes debuffs / dots etc., we don't want the player to die after porting out
                 bgTypeId=BATTLEGROUND_AA;       // set the bg type to all arenas (it will be used for queue refreshing)
 
-                // summon old pet if there was one and there isn't a current pet
-                if (!plr->GetPet() && plr->GetTemporaryUnsummonedPetNumber())
-                {
-                    Pet* NewPet = new Pet;
-                    if (!NewPet->LoadPetFromDB(plr, 0, (plr)->GetTemporaryUnsummonedPetNumber(), true))
-                        delete NewPet;
-
-                    (plr)->SetTemporaryUnsummonedPetNumber(0);
-                }
+                // unsummon current and summon old pet if there was one and there isn't a current pet
+                plr->RemovePet(NULL, PET_SAVE_NOT_IN_SLOT);
+                plr->ResummonPetTemporaryUnSummonedIfAny();
 
                 if (isRated() && GetStatus() == STATUS_IN_PROGRESS)
                 {
@@ -1051,18 +1049,7 @@ void BattleGround::AddPlayer(Player *plr)
 
         plr->DestroyConjuredItems(true);
 
-        Pet* pet = plr->GetPet();
-        if (pet)
-        {
-            if (pet->getPetType() == SUMMON_PET || pet->getPetType() == HUNTER_PET)
-            {
-                (plr)->SetTemporaryUnsummonedPetNumber(pet->GetCharmInfo()->GetPetNumber());
-                (plr)->SetOldPetSpell(pet->GetUInt32Value(UNIT_CREATED_BY_SPELL));
-            }
-            plr->RemovePet(NULL,PET_SAVE_NOT_IN_SLOT);
-        }
-        else
-            plr->SetTemporaryUnsummonedPetNumber(0);
+        plr->UnsummonPetTemporaryIfAny();
 
         if (GetStatus() == STATUS_WAIT_JOIN)                 // not started yet
         {
@@ -1504,7 +1491,6 @@ bool BattleGround::DelCreature(uint32 type)
         return false;
     }
     //TODO: only delete creature after not in combat
-    cr->CleanupsBeforeDelete();
     cr->AddObjectToRemoveList();
     m_BgCreatures[type] = 0;
     return true;
@@ -1564,6 +1550,13 @@ bool BattleGround::AddSpiritGuide(uint32 type, float x, float y, float z, float 
     //pCreature->CastSpell(pCreature, SPELL_SPIRIT_HEAL_CHANNEL, true);
 
     return true;
+}
+
+void BattleGround::AddSpectatorNPC(float x, float y, float z, float o)
+{
+    Creature* pCreature = AddCreature(WORLD_TRIGGER, ARENA_NPC_SPECTATOR, 0, x,y,z,o);
+    if (!pCreature)
+        sLog.outError("Can't create Arena Spectator!");
 }
 
 void BattleGround::SendMessageToAll(char const* text)
@@ -1780,4 +1773,17 @@ void BattleGround::EventPlayerLoggedOut(Player* player)
 
     if (isArena())
         RemovePlayerAtLeave(player->GetGUID(), true, true);
+}
+
+void BattleGround::SetBgRaid( uint32 TeamID, Group *bg_raid )
+{
+    Group* &old_raid = TeamID == ALLIANCE ? m_BgRaids[BG_TEAM_ALLIANCE] : m_BgRaids[BG_TEAM_HORDE];
+
+    if (old_raid)
+        old_raid->SetBattlegroundGroup(NULL);
+
+    if (bg_raid)
+        bg_raid->SetBattlegroundGroup(this);
+
+    old_raid = bg_raid;
 }

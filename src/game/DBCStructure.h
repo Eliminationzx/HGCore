@@ -21,11 +21,9 @@
 #ifndef DBCSTRUCTURE_H
 #define DBCSTRUCTURE_H
 
-#include "Common.h"
 #include "DBCEnums.h"
-#include "../game/Path.h"
 #include "Platform/Define.h"
-
+#include "Path.h"
 #include <map>
 #include <set>
 #include <vector>
@@ -77,11 +75,11 @@ struct CinematicSequenceEntry
 
 struct AuctionHouseEntry
 {
-    uint32 houseId; // 0 index
-    uint32 faction; // 1 id of faction.dbc for player factions associated with city
-    uint32 depositPercent; // 2 1/3 from real
-    uint32 cutPercent; // 3
-    //char* name[16]; // 4-19
+    uint32    houseId;                                      // 0 index
+    uint32    faction;                                      // 1 id of faction.dbc for player factions associated with city
+    uint32    depositPercent;                               // 2 1/3 from real
+    uint32    cutPercent;                                   // 3
+    //char*     name[16];                                   // 4-19
                                                             // 20 string flag, unused
 };
 
@@ -148,7 +146,6 @@ struct ChrClassesEntry
                                                             // 1-2, unused
     uint32      powerType;                                  // 3
                                                             // 4, unused
-    //char*       name[16];                                 // 5-20 unused
     char*       name[16];                                   // 5-20 unused
                                                             // 21 string flag, unused
     //char*       nameFemale[16];                           // 21-36 unused, if different from base (male) case
@@ -171,7 +168,7 @@ struct ChrRacesEntry
                                                             // 6-7 unused
     uint32      TeamID;                                     // 8 (7-Alliance 1-Horde)
                                                             // 9-12 unused
-    uint32      startmovie;                                 // 13 id from CinematicCamera.dbc
+    uint32      CinematicSequence;                          // 13 id from CinematicCamera.dbc
     char*       name[16];                                   // 14-29 used for DBC language detection/selection
                                                             // 30 string flags, unused
     //char*       nameFemale[16];                           // 31-46, if different from base (male) case
@@ -180,6 +177,27 @@ struct ChrRacesEntry
                                                             // 64 string flags, unused
                                                             // 65-67 unused
     uint32      addon;                                      // 68 (0 - original race, 1 - tbc addon, ...)
+};
+
+/* not used
+struct CinematicCameraEntry
+{
+    uint32      id;                                         // 0 index
+    char*       filename;                                   // 1
+    uint32      soundid;                                    // 2 in SoundEntries.dbc or 0
+    float       start_x;                                    // 3
+    float       start_y;                                    // 4
+    float       start_z;                                    // 5
+    float       unk6;                                       // 6 speed?
+};
+*/
+
+struct CinematicSequencesEntry
+{
+    uint32      Id;                                         // 0 index
+    //uint32      unk1;                                     // 1 always 0
+    //uint32      cinematicCamera;                          // 2 id in CinematicCamera.dbc
+                                                            // 3-9 always 0
 };
 
 struct CreatureDisplayInfoEntry
@@ -262,39 +280,57 @@ struct FactionTemplateEntry
     uint32      ourMask;                                    // 3 if mask set (see FactionMasks) then faction included in masked team
     uint32      friendlyMask;                               // 4 if mask set (see FactionMasks) then faction friendly to masked team
     uint32      hostileMask;                                // 5 if mask set (see FactionMasks) then faction hostile to masked team
-    uint32      enemyFaction1;                              // 6
-    uint32      enemyFaction2;                              // 7
-    uint32      enemyFaction3;                              // 8
-    uint32      enemyFaction4;                              // 9
-    uint32      friendFaction1;                             // 10
-    uint32      friendFaction2;                             // 11
-    uint32      friendFaction3;                             // 12
-    uint32      friendFaction4;                             // 13
+    uint32      enemyFaction[4];                            // 6-9
+    uint32      friendFaction[4];                           // 10-13
     //-------------------------------------------------------  end structure
 
     // helpers
     bool IsFriendlyTo(FactionTemplateEntry const& entry) const
     {
-        if(ID == entry.ID)
+        if (ID == entry.ID)
             return true;
-        if(enemyFaction1  == entry.faction || enemyFaction2  == entry.faction || enemyFaction3 == entry.faction || enemyFaction4 == entry.faction )
-            return false;
-        if(friendFaction1 == entry.faction || friendFaction2 == entry.faction || friendFaction3 == entry.faction || friendFaction4 == entry.faction )
-            return true;
+
+        if (entry.faction)
+        {
+            for (int i = 0; i < 4; ++i)
+                if (enemyFaction[i] == entry.faction)
+                    return false;
+            for (int i = 0; i < 4; ++i)
+                if (friendFaction[i] == entry.faction)
+                    return true;
+        }
+
         return (friendlyMask & entry.ourMask) || (ourMask & entry.friendlyMask);
     }
+
     bool IsHostileTo(FactionTemplateEntry const& entry) const
     {
-        if(ID == entry.ID)
+        if (ID == entry.ID)
             return false;
-        if(enemyFaction1  == entry.faction || enemyFaction2  == entry.faction || enemyFaction3 == entry.faction || enemyFaction4 == entry.faction )
-            return true;
-        if(friendFaction1 == entry.faction || friendFaction2 == entry.faction || friendFaction3 == entry.faction || friendFaction4 == entry.faction )
-            return false;
+
+        if (entry.faction)
+        {
+            for (int i = 0; i < 4; ++i)
+                if (enemyFaction[i]  == entry.faction)
+                    return true;
+            for (int i = 0; i < 4; ++i)
+                if (friendFaction[i] == entry.faction)
+                    return false;
+        }
+
         return (hostileMask & entry.ourMask) != 0;
     }
+
     bool IsHostileToPlayers() const { return (hostileMask & FACTION_MASK_PLAYER) !=0; }
-    bool IsNeutralToAll() const { return hostileMask == 0 && friendlyMask == 0 && enemyFaction1==0 && enemyFaction2==0 && enemyFaction3==0 && enemyFaction4==0; }
+
+    bool IsNeutralToAll() const
+    {
+        for (int i = 0; i < 4; ++i)
+            if (enemyFaction[i] != 0)
+                return false;
+        return hostileMask == 0 && friendlyMask == 0;
+    }
+
     bool IsContestedGuardFaction() const { return (factionFlags & FACTION_TEMPLATE_FLAG_CONTESTED_GUARD)!=0; }
 };
 
@@ -374,6 +410,13 @@ struct ItemEntry
    uint32 Sheath;
 };
 
+struct ItemBagFamilyEntry
+{
+    uint32   ID;                                            // 0
+    //char*     name[16]                                    // 1-16     m_name_lang
+    //                                                      // 17       name flags
+};
+
 struct ItemDisplayInfoEntry
 {
     uint32      ID;
@@ -431,16 +474,15 @@ struct ItemSetEntry
     uint32    required_skill_value;                         // 52
 };
 
+#define MAX_LOCK_CASE 8
+
 struct LockEntry
 {
-    uint32      ID;                                         // 0
-    uint32      keytype[5];                                 // 1-5
-                                                            // 6-8, not used
-    uint32      key[5];                                     // 9-13
-                                                            // 14-16, not used
-    uint32      requiredminingskill;                        // 17
-    uint32      requiredlockskill;                          // 18
-                                                            // 19-32, not used
+    uint32      ID;                                         // 0        m_ID
+    uint32      Type[MAX_LOCK_CASE];                        // 1-5      m_Type
+    uint32      Index[MAX_LOCK_CASE];                       // 9-16     m_Index
+    uint32      Skill[MAX_LOCK_CASE];                       // 17-24    m_Skill
+    //uint32      Action[MAX_LOCK_CASE];                    // 25-32    m_Action
 };
 
 struct MailTemplateEntry
@@ -499,14 +541,15 @@ struct MapEntry
     bool IsMountAllowed() const
     {
         return !IsDungeon() ||
-            MapID==568 || MapID==309 || MapID==209 || MapID==534 ||
-            MapID==560 || MapID==509 || MapID==269;
+            MapID==209 || MapID==269 || MapID==309 ||       // TanarisInstance, CavernsOfTime, Zul'gurub
+            MapID==509 || MapID==534 || MapID==560 ||       // AhnQiraj, HyjalPast, HillsbradPast
+            MapID==568 || MapID==580;                       // ZulAman, Sunwell Plateau
     }
 
     bool IsContinent() const
     {
         return MapID == 0 || MapID == 1 || MapID == 530;
-     }
+    }
 };
 
 struct QuestSortEntry
@@ -552,7 +595,7 @@ struct RandomPropertiesPointsEntry
 struct SkillLineEntry
 {
     uint32    id;                                           // 0
-    uint32    categoryId;                                   // 1 (index from SkillLineCategory.dbc)
+    int32    categoryId;                                    // 1 (index from SkillLineCategory.dbc)
     //uint32    skillCostID;                                // 2 not used
     char*     name[16];                                     // 3-18
                                                             // 19 string flags, not used
@@ -644,7 +687,7 @@ struct SpellEntry
     int32     EquippedItemInventoryTypeMask;                // 64 (mask)
     uint32    Effect[3];                                    // 65-67
     int32     EffectDieSides[3];                            // 68-70
-    int32     EffectBaseDice[3];                            // 71-73
+    uint32    EffectBaseDice[3];                            // 71-73
     float     EffectDicePerLevel[3];                        // 74-76
     float     EffectRealPointsPerLevel[3];                  // 77-79
     int32     EffectBasePoints[3];                          // 80-82 (don't must be used in spell/auras explicitly, must be used cached Spell::m_currentBasePoints)
@@ -691,6 +734,9 @@ struct SpellEntry
     uint32    TotemCategory[2];                             // 212-213
     uint32    AreaId;                                       // 214
     uint32    SchoolMask;                                   // 215 school mask
+
+    // helpers
+    int32 CalculateSimpleValue(uint8 eff) const { return EffectBasePoints[eff]+int32(EffectBaseDice[eff]); }
 
     private:
         // prevent creating custom entries (copy data from original in fact)
@@ -798,6 +844,18 @@ struct StableSlotPricesEntry
     uint32 Slot;
     uint32 Price;
 };
+
+/* unused currently
+struct SummonPropertiesEntry
+{
+    uint32  Id;                                             // 0
+    uint32  Group;                                          // 1, enum SummonPropGroup,  0 - can't be controlled?, 1 - something guardian?, 2 - pet?, 3 - something controllable?, 4 - taxi/mount?
+    uint32  Unk2;                                           // 2,                        14 rows > 0
+    uint32  Type;                                           // 3, enum SummonPropType
+    uint32  Slot;                                           // 4,                        0-6
+    uint32  Flags;                                          // 5, enum SummonPropFlags
+};
+*/
 
 struct TalentEntry
 {
@@ -958,4 +1016,3 @@ typedef std::vector<TaxiPathNodeList> TaxiPathNodesByPath;
 #define TaxiMaskSize 16
 typedef uint32 TaxiMask[TaxiMaskSize];
 #endif
-

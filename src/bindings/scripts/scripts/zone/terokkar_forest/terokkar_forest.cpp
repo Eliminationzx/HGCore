@@ -342,7 +342,7 @@ bool GossipHello_npc_skyguard_handler_deesak(Player *player, Creature *_Creature
     if (_Creature->isQuestGiver())
         player->PrepareQuestMenu( _Creature->GetGUID() );
 
-    if (player->GetReputationRank(1031) >= REP_HONORED)
+    if (player->GetReputationMgr().GetRank(1031) >= REP_HONORED)
         player->ADD_GOSSIP_ITEM( 2, GOSSIP_SKYGUARD, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+1);
 
     player->SEND_GOSSIP_MENU(_Creature->GetNpcTextId(), _Creature->GetGUID());
@@ -664,7 +664,6 @@ struct TRINITY_DLL_DECL mob_terokkAI : public ScriptedAI
     void Despawn(Unit *unit)
     {
         unit->CombatStop();
-        unit->CleanupsBeforeDelete();
         unit->AddObjectToRemoveList();
     }
 
@@ -852,7 +851,6 @@ struct TRINITY_DLL_DECL npc_skyguard_aceAI : public ScriptedAI
         else if(id == SKYGUARD_WP_DESPAWN)
         {
             me->CombatStop();
-            me->CleanupsBeforeDelete();
             me->AddObjectToRemoveList();
         }
         else if(id == SKYGUARD_WP_MIDDLE)
@@ -889,7 +887,6 @@ struct TRINITY_DLL_DECL npc_skyguard_aceAI : public ScriptedAI
                 if(Unit* unit = me->GetMap()->GetCreature(TargetGUID))
                 {
                     unit->CombatStop();
-                    unit->CleanupsBeforeDelete();
                     unit->AddObjectToRemoveList();
                 }
                 TargetGUID = 0;

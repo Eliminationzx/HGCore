@@ -303,8 +303,8 @@ Spell::Spell(Unit* Caster, SpellEntry const *info, bool triggered, uint64 origin
                 m_attackType = RANGED_ATTACK;
                 if (m_caster->getClassMask() & CLASSMASK_WAND_USERS && m_caster->GetTypeId()==TYPEID_PLAYER)
                 {
-                    if (Item* pItem = dynamic_cast<Player *>(m_caster)->GetWeaponForAttack(RANGED_ATTACK))
-                    m_spellSchoolMask = SpellSchoolMask(1 << pItem->GetProto()->Damage->DamageType);
+                    if (Item* pItem = ((Player*)m_caster)->GetWeaponForAttack(RANGED_ATTACK))
+                        m_spellSchoolMask = SpellSchoolMask(1 << pItem->GetProto()->Damage[0].DamageType);
                 }
             }
             else
@@ -1066,12 +1066,13 @@ void Spell::DoAllEffectOnTarget(TargetInfo *target)
     }
 
     // Call scripted function for AI if this spell is casted upon a creature (except pets)
-    if (IS_CREATURE_GUID(target->targetGUID))
+    if (unit->GetTypeId() == TYPEID_UNIT)
     {
         // cast at creature (or GO) quest objectives update at successful cast finished (+channel finished)
-        // ignore autorepeat/melee casts for speed (not exist quest for spells (hm...)
-        if (m_caster->GetTypeId() == TYPEID_PLAYER && !IsAutoRepeat() && !IsNextMeleeSwingSpell() && !IsChannelActive())
-            ((Player*)m_caster)->CastedCreatureOrGO(unit->GetEntry(),unit->GetGUID(),m_spellInfo->Id);
+        // ignore pets or autorepeat/melee casts for speed (not exist quest for spells (hm... )
+        if (!((Creature*)unit)->isPet() && !IsAutoRepeat() && !IsNextMeleeSwingSpell() && !IsChannelActive())
+            if (Player* p = GetPlayerForCastQuestCond())
+                p->CastedCreatureOrGO(unit->GetEntry(), unit->GetGUID(), m_spellInfo->Id);
     }
 
     if (!m_caster->IsFriendlyTo(unit) && !IsPositiveSpell(m_spellInfo->Id))
@@ -1271,8 +1272,9 @@ void Spell::DoAllEffectOnTarget(GOTargetInfo *target)
 
     // cast at creature (or GO) quest objectives update at successful cast finished (+channel finished)
     // ignore autorepeat/melee casts for speed (not exist quest for spells (hm...)
-    if (m_caster->GetTypeId() == TYPEID_PLAYER && !IsAutoRepeat() && !IsNextMeleeSwingSpell() && !IsChannelActive())
-        ((Player*)m_caster)->CastedCreatureOrGO(go->GetEntry(),go->GetGUID(),m_spellInfo->Id);
+    if (!IsAutoRepeat() && !IsNextMeleeSwingSpell() && !IsChannelActive())
+        if (Player* p = GetPlayerForCastQuestCond())
+            p->CastedCreatureOrGO(go->GetEntry(), go->GetGUID(), m_spellInfo->Id);
 }
 
 void Spell::DoAllEffectOnTarget(ItemTargetInfo *target)
@@ -2260,8 +2262,8 @@ void Spell::prepare(SpellCastTargets * targets, Aura* triggeredByAura)
     // Fill cost data
     m_powerCost = m_CastItem ? 0 : CalculatePowerCost(m_spellInfo, m_caster, m_spellSchoolMask);
 
-    uint8 result = CanCast(true);
-    if (result != 0 && !IsAutoRepeat())                      //always cast autorepeat dummy for triggering
+    SpellCastResult result = CheckCast(true);
+    if(result != SPELL_CAST_OK && !IsAutoRepeat())          //always cast autorepeat dummy for triggering
     {
         if (triggeredByAura)
         {
@@ -2276,7 +2278,7 @@ void Spell::prepare(SpellCastTargets * targets, Aura* triggeredByAura)
     // Prepare data for triggers
     prepareDataForTriggerSystem();
 
-    // calculate cast time (calculated after first CanCast check to prevent charge counting for first CanCast fail)
+    // calculate cast time (calculated after first CheckCast check to prevent charge counting for first CheckCast fail)
     m_casttime = GetSpellCastTime(m_spellInfo, this);
 
     // HACK for instant opening of Spectral Blast Portal
@@ -2404,7 +2406,7 @@ void Spell::cast(bool skipCheck)
     }
 
     SetExecutedCurrently(true);
-    uint8 castResult = 0;
+    SpellCastResult castResult = SPELL_CAST_OK;
 
     // cancel at lost main target unit
     if (!m_targets.getUnitTarget() && m_targets.getUnitTargetGUID() && m_targets.getUnitTargetGUID() != m_caster->GetGUID())
@@ -2420,7 +2422,7 @@ void Spell::cast(bool skipCheck)
     if (!m_IsTriggeredSpell)
     {
         castResult = CheckPower();
-        if (castResult != 0)
+        if (castResult != SPELL_CAST_OK)
         {
             SendCastResult(castResult);
             finish(false);
@@ -2432,8 +2434,8 @@ void Spell::cast(bool skipCheck)
     // triggered cast called from Spell::prepare where it was already checked
     if (!skipCheck)
     {
-        castResult = CanCast(false);
-        if (castResult != 0)
+        castResult = CheckCast(false);
+        if (castResult != SPELL_CAST_OK)
         {
             SendCastResult(castResult);
             finish(false);
@@ -2739,7 +2741,7 @@ void Spell::SendSpellCooldown()
         ItemPrototype const* proto = m_CastItem->GetProto();
         if (proto)
         {
-            for (int idx = 0; idx < 5; ++idx)
+            for (int idx = 0; idx < MAX_ITEM_PROTO_SPELLS; ++idx)
             {
                 if (proto->Spells[idx].SpellId == m_spellInfo->Id)
                 {
@@ -2880,36 +2882,39 @@ void Spell::update(uint32 difftime)
                 // channeled spell processed independently for quest targeting
                 // cast at creature (or GO) quest objectives update at successful cast channel finished
                 // ignore autorepeat/melee casts for speed (not exist quest for spells (hm...)
-                if (m_caster->GetTypeId() == TYPEID_PLAYER && !IsAutoRepeat() && !IsNextMeleeSwingSpell())
+                if (!IsAutoRepeat() && !IsNextMeleeSwingSpell())
                 {
-                    for (std::list<TargetInfo>::iterator ihit= m_UniqueTargetInfo.begin();ihit != m_UniqueTargetInfo.end();++ihit)
+                    if (Player* p = GetPlayerForCastQuestCond())
                     {
-                        if (ihit->deleted)
-                            continue;
+                        for (std::list<TargetInfo>::iterator ihit= m_UniqueTargetInfo.begin();ihit != m_UniqueTargetInfo.end();++ihit)
+                        {
+                            if (ihit->deleted)
+                                continue;
 
-                        TargetInfo* target = &*ihit;
-                        if (!IS_CREATURE_GUID(target->targetGUID))
-                            continue;
+                            TargetInfo* target = &*ihit;
+                            if (!IS_CREATURE_GUID(target->targetGUID))
+                                continue;
 
-                        Unit* unit = m_caster->GetGUID()==target->targetGUID ? m_caster : m_caster->GetMap()->GetUnit(target->targetGUID);
-                        if (unit==NULL)
-                            continue;
+                            Unit* unit = m_caster->GetGUID()==target->targetGUID ? m_caster : m_caster->GetMap()->GetUnit(target->targetGUID);
+                            if (unit==NULL)
+                                continue;
 
-                        ((Player*)m_caster)->CastedCreatureOrGO(unit->GetEntry(),unit->GetGUID(),m_spellInfo->Id);
-                    }
+                            p->CastedCreatureOrGO(unit->GetEntry(),unit->GetGUID(),m_spellInfo->Id);
+                        }
 
-                    for (std::list<GOTargetInfo>::iterator ihit= m_UniqueGOTargetInfo.begin();ihit != m_UniqueGOTargetInfo.end();++ihit)
-                    {
-                        if (ihit->deleted)
-                            continue;
+                        for (std::list<GOTargetInfo>::iterator ihit= m_UniqueGOTargetInfo.begin();ihit != m_UniqueGOTargetInfo.end();++ihit)
+                        {
+                            if (ihit->deleted)
+                                continue;
 
-                        GOTargetInfo* target = &*ihit;
+                            GOTargetInfo* target = &*ihit;
 
-                        GameObject* go = m_caster->GetMap()->GetGameObject(target->targetGUID);
-                        if (!go)
-                            continue;
+                            GameObject* go = m_caster->GetMap()->GetGameObject(target->targetGUID);
+                            if (!go)
+                                continue;
 
-                        ((Player*)m_caster)->CastedCreatureOrGO(go->GetEntry(),go->GetGUID(),m_spellInfo->Id);
+                            p->CastedCreatureOrGO(go->GetEntry(),go->GetGUID(),m_spellInfo->Id);
+                        }
                     }
                 }
 
@@ -2982,7 +2987,7 @@ void Spell::finish(bool ok)
         m_caster->AttackStop();
 }
 
-void Spell::SendCastResult(uint8 result)
+void Spell::SendCastResult(SpellCastResult result)
 {
     if (m_caster->GetTypeId() != TYPEID_PLAYER)
         return;
@@ -2990,64 +2995,63 @@ void Spell::SendCastResult(uint8 result)
     if (((Player*)m_caster)->GetSession()->PlayerLoading())  // don't send cast results at loading time
         return;
 
-    if (result != 0)
-    {
-        WorldPacket data(SMSG_CAST_FAILED, (4+1+1));
-        data << uint32(m_spellInfo->Id);
-        data << uint8(result);                              // problem
-        data << uint8(m_cast_count);                        // single cast or multi 2.3 (0/1)
-        switch (result)
-        {
-            case SPELL_FAILED_REQUIRES_SPELL_FOCUS:
-                data << uint32(m_spellInfo->RequiresSpellFocus);
-                break;
-            case SPELL_FAILED_REQUIRES_AREA:
-                // hardcode areas limitation case
-                switch (m_spellInfo->Id)
-                {
-                    case 41617:                             // Cenarion Mana Salve
-                    case 41619:                             // Cenarion Healing Salve
-                        data << uint32(3905);
-                        break;
-                    case 41618:                             // Bottled Nethergon Energy
-                    case 41620:                             // Bottled Nethergon Vapor
-                        data << uint32(3842);
-                        break;
-                    case 45373:                             // Bloodberry Elixir
-                        data << uint32(4075);
-                        break;
-                    default:                                // default case
-                        data << uint32(m_spellInfo->AreaId);
-                        break;
-                }
-                break;
-            case SPELL_FAILED_TOTEMS:
-                if (m_spellInfo->Totem[0])
-                    data << uint32(m_spellInfo->Totem[0]);
-                if (m_spellInfo->Totem[1])
-                    data << uint32(m_spellInfo->Totem[1]);
-                break;
-            case SPELL_FAILED_TOTEM_CATEGORY:
-                if (m_spellInfo->TotemCategory[0])
-                    data << uint32(m_spellInfo->TotemCategory[0]);
-                if (m_spellInfo->TotemCategory[1])
-                    data << uint32(m_spellInfo->TotemCategory[1]);
-                break;
-            case SPELL_FAILED_EQUIPPED_ITEM_CLASS:
-                data << uint32(m_spellInfo->EquippedItemClass);
-                data << uint32(m_spellInfo->EquippedItemSubClassMask);
-                data << uint32(m_spellInfo->EquippedItemInventoryTypeMask);
-                break;
-        }
-        ((Player*)m_caster)->GetSession()->SendPacket(&data);
-    }
-    else
+    if (result == SPELL_CAST_OK)
     {
         WorldPacket data(SMSG_CLEAR_EXTRA_AURA_INFO, (8+4));
         data << m_caster->GetPackGUID();
         data << uint32(m_spellInfo->Id);
         ((Player*)m_caster)->GetSession()->SendPacket(&data);
+        return;
     }
+
+    WorldPacket data(SMSG_CAST_FAILED, (4+1+1));
+    data << uint32(m_spellInfo->Id);
+    data << uint8(result);                              // problem
+    data << uint8(m_cast_count);                        // single cast or multi 2.3 (0/1)
+    switch (result)
+    {
+        case SPELL_FAILED_REQUIRES_SPELL_FOCUS:
+            data << uint32(m_spellInfo->RequiresSpellFocus);
+            break;
+        case SPELL_FAILED_REQUIRES_AREA:
+            // hardcode areas limitation case
+            switch (m_spellInfo->Id)
+            {
+                case 41617:                             // Cenarion Mana Salve
+                case 41619:                             // Cenarion Healing Salve
+                    data << uint32(3905);
+                    break;
+                case 41618:                             // Bottled Nethergon Energy
+                case 41620:                             // Bottled Nethergon Vapor
+                    data << uint32(3842);
+                    break;
+                case 45373:                             // Bloodberry Elixir
+                    data << uint32(4075);
+                    break;
+                default:                                // default case
+                    data << uint32(m_spellInfo->AreaId);
+                    break;
+            }
+            break;
+        case SPELL_FAILED_TOTEMS:
+            if (m_spellInfo->Totem[0])
+                data << uint32(m_spellInfo->Totem[0]);
+            if (m_spellInfo->Totem[1])
+                data << uint32(m_spellInfo->Totem[1]);
+            break;
+        case SPELL_FAILED_TOTEM_CATEGORY:
+            if (m_spellInfo->TotemCategory[0])
+                data << uint32(m_spellInfo->TotemCategory[0]);
+            if (m_spellInfo->TotemCategory[1])
+                data << uint32(m_spellInfo->TotemCategory[1]);
+            break;
+        case SPELL_FAILED_EQUIPPED_ITEM_CLASS:
+            data << uint32(m_spellInfo->EquippedItemClass);
+            data << uint32(m_spellInfo->EquippedItemSubClassMask);
+            data << uint32(m_spellInfo->EquippedItemInventoryTypeMask);
+            break;
+    }
+    ((Player*)m_caster)->GetSession()->SendPacket(&data);
 }
 
 void Spell::SendSpellStart()
@@ -3451,7 +3455,7 @@ void Spell::TakeCastItem()
     bool expendable = false;
     bool withoutCharges = false;
 
-    for (int i = 0; i<5; i++)
+    for (int i = 0; i < MAX_ITEM_PROTO_SPELLS; ++i)
     {
         if (proto->Spells[i].SpellId)
         {
@@ -3556,13 +3560,11 @@ void Spell::TakeReagents()
     if (m_caster->GetTypeId() != TYPEID_PLAYER)
         return;
 
-    if (m_spellInfo->AttributesEx5 & SPELL_ATTR_EX5_NO_REAGENT_WHILE_PREP &&
-        m_caster->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PREPARATION))
+    Player* p_caster = (Player*)m_caster;
+    if (p_caster->CanNoReagentCast(m_spellInfo))
         return;
 
-    Player* p_caster = (Player*)m_caster;
-
-    for (uint32 x=0;x<8;x++)
+    for (uint32 x = 0; x < 8; ++x)
     {
         if (m_spellInfo->Reagent[x] <= 0)
             continue;
@@ -3576,7 +3578,7 @@ void Spell::TakeReagents()
             ItemPrototype const *proto = m_CastItem->GetProto();
             if (proto && proto->ItemId == itemid)
             {
-                for (int s=0;s<5;s++)
+                for (int s = 0; s < MAX_ITEM_PROTO_SPELLS; ++s)
                 {
                     // CastItem will be used up and does not count as reagent
                     int32 charges = m_CastItem->GetSpellCharges(s);
@@ -3650,7 +3652,7 @@ void Spell::TriggerSpell()
     }
 }
 
-uint8 Spell::CanCast(bool strict)
+SpellCastResult Spell::CheckCast(bool strict)
 {
     // check cooldowns to prevent cheating
     if (!m_IsTriggeredSpell && m_caster->GetTypeId()==TYPEID_PLAYER && ((Player*)m_caster)->HasSpellCooldown(m_spellInfo->Id))
@@ -3680,7 +3682,8 @@ uint8 Spell::CanCast(bool strict)
     if (strict && !m_IsTriggeredSpell)
     {
         // Cannot be used in this stance/form
-        if (uint8 shapeError = GetErrorAtShapeshiftedCast(m_spellInfo, m_caster->m_form))
+        SpellCastResult shapeError = GetErrorAtShapeshiftedCast(m_spellInfo, m_caster->m_form);
+        if(shapeError != SPELL_CAST_OK)
             return shapeError;
 
         if ((m_spellInfo->Attributes & SPELL_ATTR_ONLY_STEALTHED) && !(m_caster->HasStealthAura()))
@@ -3690,6 +3693,7 @@ uint8 Spell::CanCast(bool strict)
     // caster state requirements
     if (m_spellInfo->CasterAuraState && !m_caster->HasAuraState(AuraState(m_spellInfo->CasterAuraState)))
         return SPELL_FAILED_CASTER_AURASTATE;
+
     if (m_spellInfo->CasterAuraStateNot && m_caster->HasAuraState(AuraState(m_spellInfo->CasterAuraStateNot)))
         return SPELL_FAILED_CASTER_AURASTATE;
 
@@ -3716,9 +3720,7 @@ uint8 Spell::CanCast(bool strict)
             return SPELL_FAILED_ONLY_INDOORS;
     }
 
-    Unit *target = m_targets.getUnitTarget();
-
-    if (target)
+    if (Unit *target = m_targets.getUnitTarget())
     {
         // target state requirements (not allowed state), apply to self also
         if (m_spellInfo->TargetAuraStateNot && target->HasAuraState(AuraState(m_spellInfo->TargetAuraStateNot)))
@@ -3880,7 +3882,7 @@ uint8 Spell::CanCast(bool strict)
                 return SPELL_FAILED_NOT_IN_ARENA;
 
     // zone check
-    if (!IsSpellAllowedInLocation(m_spellInfo,m_caster->GetMapId(),m_caster->GetZoneId(),m_caster->GetAreaId()))
+    if (!IsSpellAllowedInLocation(m_spellInfo, m_caster->GetMapId(), m_caster->GetZoneId(), m_caster->GetAreaId()))
         return SPELL_FAILED_REQUIRES_AREA;
 
     // not let players cast spells at mount (and let do it to creatures)
@@ -3895,18 +3897,24 @@ uint8 Spell::CanCast(bool strict)
 
     // always (except passive and triggered spells) check items (focus object can be required for any type casts)
     if (!IsPassiveSpell(m_spellInfo->Id) && !m_IsTriggeredSpell)
-        if (uint8 castResult = CheckItems())
-            return castResult;
+    {
+        SpellCastResult castResult = CheckItems();
+        if (castResult != SPELL_CAST_OK)
+             return castResult;
+    }
 
     if (!m_IsTriggeredSpell || m_spellInfo->Id == 33395) // hack for water elemental freeze since it is casted as triggered spell
     {
-        if (uint8 castResult = CheckRange(strict))
+        SpellCastResult castResult = CheckRange(strict);
+        if (castResult != SPELL_CAST_OK)
             return castResult;
 
-        if (uint8 castResult = CheckPower())
+        castResult = CheckPower();
+        if (castResult != SPELL_CAST_OK)
             return castResult;
 
-        if (uint8 castResult = CheckCasterAuras())
+        castResult = CheckCasterAuras();
+        if (castResult != SPELL_CAST_OK)
             return castResult;
     }
 
@@ -3931,7 +3939,7 @@ uint8 Spell::CanCast(bool strict)
                 {
                     // spell different for friends and enemies
                     // hart version required facing
-                    if (m_targets.getUnitTarget() && !m_caster->IsFriendlyTo(m_targets.getUnitTarget()) && !m_caster->HasInArc(M_PI, target))
+                    if (m_targets.getUnitTarget() && !m_caster->IsFriendlyTo(m_targets.getUnitTarget()) && !m_caster->HasInArc(M_PI, m_targets.getUnitTarget()))
                         return SPELL_FAILED_UNIT_NOT_INFRONT;
                 }
                 else if (m_spellInfo->Id == 19938)          // Awaken Peon
@@ -4098,124 +4106,34 @@ uint8 Spell::CanCast(bool strict)
                     return SPELL_FAILED_TRY_AGAIN;
 
                 // get the lock entry
-                LockEntry const *lockInfo = NULL;
+                uint32 lockId = 0;
                 if (GameObject* go=m_targets.getGOTarget())
                 {
-                    lockInfo = sLockStore.LookupEntry(go->GetLockId());
-                    if (!go->GetLockId())
+                    lockId = go->GetLockId();
+                    if (!lockId)
                         return SPELL_FAILED_BAD_TARGETS;
                 }
                 else if (Item* itm=m_targets.getItemTarget())
-                    lockInfo = sLockStore.LookupEntry(itm->GetProto()->LockID);
+                    lockId = itm->GetProto()->LockID;
 
-                // check lock compatibility
-                if (lockInfo)
-                {
-                    // check for lock - key pair (checked by client also, just prevent cheating
-                    bool ok_key = false;
-                    for (int it = 0; it < 5; ++it)
-                    {
-                        switch (lockInfo->keytype[it])
-                        {
-                            case LOCK_KEY_NONE:
-                                break;
-                            case LOCK_KEY_ITEM:
-                            {
-                                if (lockInfo->key[it])
-                                {
-                                    if (m_CastItem && m_CastItem->GetEntry()==lockInfo->key[it])
-                                        ok_key =true;
-                                    break;
-                                }
-                            }
-                            case LOCK_KEY_SKILL:
-                            {
-                                if (uint32(m_spellInfo->EffectMiscValue[i])!=lockInfo->key[it])
-                                    break;
+                SkillType skillId =SKILL_NONE;
+                int32 reqSkillValue = 0;
+                int32 skillValue = 0;
 
-                                switch (lockInfo->key[it])
-                                {
-                                    case LOCKTYPE_HERBALISM:
-                                        if (((Player*)m_caster)->HasSkill(SKILL_HERBALISM))
-                                            ok_key =true;
-                                        break;
-                                    case LOCKTYPE_MINING:
-                                        if (((Player*)m_caster)->HasSkill(SKILL_MINING))
-                                            ok_key =true;
-                                        break;
-                                    default:
-                                        ok_key =true;
-                                        break;
-                                }
-                            }
-                        }
-                        if (ok_key)
-                            break;
-                    }
-
-                    if (!ok_key)
-                        return SPELL_FAILED_BAD_TARGETS;
-                }
+                SpellCastResult res = CanOpenLock(i, lockId, skillId, reqSkillValue, skillValue);
+                if (res != SPELL_CAST_OK)
+                    return res;
 
                 // chance for fail at orange mining/herb/LockPicking gathering attempt
-                if (!m_selfContainer || ((*m_selfContainer) != this))
-                    break;
-
-                // get the skill value of the player
-                int32 SkillValue = 0;
-                bool canFailAtMax = true;
-                if (m_spellInfo->EffectMiscValue[i] == LOCKTYPE_HERBALISM)
+                // second check prevent fail at rechecks
+                if (skillId != SKILL_NONE && (!m_selfContainer || ((*m_selfContainer) != this)))
                 {
-                    SkillValue = ((Player*)m_caster)->GetSkillValue(SKILL_HERBALISM);
-                    canFailAtMax = false;
+                    bool canFailAtMax = skillId != SKILL_HERBALISM && skillId != SKILL_MINING;
+
+                    // chance for failure in orange gather / lockpick (gathering skill can't fail at maxskill)
+                    if((canFailAtMax || skillValue < sWorld.GetConfigMaxSkillValue()) && reqSkillValue > irand(skillValue-25, skillValue+37))
+                        return SPELL_FAILED_TRY_AGAIN;
                 }
-                else if (m_spellInfo->EffectMiscValue[i] == LOCKTYPE_MINING)
-                {
-                    SkillValue = ((Player*)m_caster)->GetSkillValue(SKILL_MINING);
-                    canFailAtMax = false;
-                }
-                else if (m_spellInfo->EffectMiscValue[i] == LOCKTYPE_PICKLOCK)
-                    SkillValue = ((Player*)m_caster)->GetSkillValue(SKILL_LOCKPICKING);
-
-                // castitem check: rogue using skeleton keys. the skill values should not be added in this case.
-                if (m_CastItem)
-                    SkillValue = 0;
-
-                // add the damage modifier from the spell casted (cheat lock / skeleton key etc.) (use m_currentBasePoints, CalculateDamage returns wrong value)
-                // TODO: is this a hack?
-                SkillValue += m_currentBasePoints[i]+1;
-
-                // get the required lock value
-                int32 ReqValue=0;
-                if (lockInfo)
-                {
-                    // check for lock - key pair
-                    bool ok = false;
-                    for (int it = 0; it < 5; ++it)
-                    {
-                        if (lockInfo->keytype[it]==LOCK_KEY_ITEM && lockInfo->key[it] && m_CastItem && m_CastItem->GetEntry()==lockInfo->key[it])
-                        {
-                            // if so, we're good to go
-                            ok = true;
-                            break;
-                        }
-                    }
-                    if (ok)
-                        break;
-
-                    if (m_spellInfo->EffectMiscValue[i] == LOCKTYPE_PICKLOCK)
-                        ReqValue = lockInfo->requiredlockskill;
-                    else
-                        ReqValue = lockInfo->requiredminingskill;
-                }
-
-                // skill doesn't meet the required value
-                if (ReqValue > SkillValue)
-                    return SPELL_FAILED_LOW_CASTLEVEL;
-
-                // chance for failure in orange gather / lockpick (gathering skill can't fail at maxskill)
-                if ((canFailAtMax || SkillValue < sWorld.GetConfigMaxSkillValue()) && ReqValue > m_caster->GetMap()->irand(SkillValue-25, SkillValue+37))
-                    return SPELL_FAILED_TRY_AGAIN;
 
                 break;
             }
@@ -4505,10 +4423,10 @@ uint8 Spell::CanCast(bool strict)
     }
 
     // all ok
-    return 0;
+    return SPELL_CAST_OK;
 }
 
-int16 Spell::PetCanCast(Unit* target)
+SpellCastResult Spell::CheckPetCast(Unit* target)
 {
     if (!m_caster->isAlive())
         return SPELL_FAILED_CASTER_DEAD;
@@ -4556,20 +4474,16 @@ int16 Spell::PetCanCast(Unit* target)
             return SPELL_FAILED_NOT_READY;
     }
 
-    uint16 result = CanCast(true);
-    if (result != 0)
-        return result;
-    else
-        return -1;                                          //this allows to check spell fail 0, in combat
+    return CheckCast(true);
 }
 
-uint8 Spell::CheckCasterAuras() const
+SpellCastResult Spell::CheckCasterAuras() const
 {
     // Flag drop spells totally immuned to caster auras
     // FIXME: find more nice check for all totally immuned spells
     // AttributesEx3 & 0x10000000?
     if (m_spellInfo->Id==23336 || m_spellInfo->Id==23334 || m_spellInfo->Id==34991)
-        return 0;
+        return SPELL_CAST_OK;
 
     uint8 school_immune = 0;
     uint32 mechanic_immune = 0;
@@ -4594,7 +4508,7 @@ uint8 Spell::CheckCasterAuras() const
     }
 
     //Check whether the cast should be prevented by any state you might have.
-    uint8 prevented_reason = 0;
+    SpellCastResult prevented_reason = SPELL_CAST_OK;
     // Have to check if there is a stun aura. Otherwise will have problems with ghost aura apply while logging out
     if (!(m_spellInfo->AttributesEx5 & SPELL_ATTR_EX5_USABLE_WHILE_STUNNED) && m_caster->HasAuraType(SPELL_AURA_MOD_STUN))
         prevented_reason = SPELL_FAILED_STUNNED;
@@ -4608,7 +4522,7 @@ uint8 Spell::CheckCasterAuras() const
         prevented_reason = SPELL_FAILED_PACIFIED;
 
     // Attr must make flag drop spell totally immune from all effects
-    if (prevented_reason)
+    if (prevented_reason != SPELL_CAST_OK)
     {
         if (school_immune || mechanic_immune || dispel_immune)
         {
@@ -4658,7 +4572,8 @@ uint8 Spell::CheckCasterAuras() const
         else
             return prevented_reason;
     }
-    return 0;                                               // all ok
+
+    return SPELL_CAST_OK;
 }
 
 bool Spell::CanAutoCast(Unit* target)
@@ -4687,9 +4602,9 @@ bool Spell::CanAutoCast(Unit* target)
         }
     }
 
-    int16 result = PetCanCast(target);
+    SpellCastResult result = CheckPetCast(target);
 
-    if (result == -1 || result == SPELL_FAILED_UNIT_NOT_INFRONT)
+    if (result == SPELL_CAST_OK || result == SPELL_FAILED_UNIT_NOT_INFRONT)
     {
         FillTargetMap();
         //check if among target units, our WANTED target is as well (->only self cast spells return false)
@@ -4705,12 +4620,13 @@ bool Spell::CanAutoCast(Unit* target)
     return false;                                           //target invalid
 }
 
-uint8 Spell::CheckRange(bool strict)
+SpellCastResult Spell::CheckRange(bool strict)
 {
     //float range_mod;
 
     // self cast doesn't need range checking -- also for Starshards fix
-    if (m_spellInfo->rangeIndex == 1) return 0;
+    if (m_spellInfo->rangeIndex == 1)
+        return SPELL_CAST_OK;
 
     // i do not know why we need this
     /*if (strict)                                             //add radius of caster
@@ -4761,21 +4677,21 @@ uint8 Spell::CheckRange(bool strict)
             return SPELL_FAILED_TOO_CLOSE;
     }
 
-    return 0;                                               // ok
+    return SPELL_CAST_OK;                                               // ok
 }
 
-uint8 Spell::CheckPower()
+SpellCastResult Spell::CheckPower()
 {
     // item cast not used power
     if (m_CastItem)
-        return 0;
+        return SPELL_CAST_OK;
 
     // health as power used - need check health amount
     if (m_spellInfo->powerType == POWER_HEALTH)
     {
         if (m_caster->GetHealth() <= m_powerCost)
             return SPELL_FAILED_CASTER_AURASTATE;
-        return 0;
+        return SPELL_CAST_OK;
     }
     // Check valid power type
     if (m_spellInfo->powerType >= MAX_POWERS)
@@ -4788,15 +4704,14 @@ uint8 Spell::CheckPower()
     if (m_caster->GetPower(powerType) < m_powerCost)
         return SPELL_FAILED_NO_POWER;
     else
-        return 0;
+        return SPELL_CAST_OK;
 }
 
-uint8 Spell::CheckItems()
+SpellCastResult Spell::CheckItems()
 {
     if (m_caster->GetTypeId() != TYPEID_PLAYER)
-        return 0;
+        return SPELL_CAST_OK;
 
-    uint32 itemid, itemcount;
     Player* p_caster = (Player*)m_caster;
 
     if (!m_CastItem)
@@ -4806,77 +4721,72 @@ uint8 Spell::CheckItems()
     }
     else
     {
-        itemid = m_CastItem->GetEntry();
+        uint32 itemid = m_CastItem->GetEntry();
         if (!p_caster->HasItemCount(itemid,1))
             return SPELL_FAILED_ITEM_NOT_READY;
-        else
+
+        ItemPrototype const *proto = m_CastItem->GetProto();
+        if (!proto)
+            return SPELL_FAILED_ITEM_NOT_READY;
+
+        for (int i = 0; i<5; i++)
+            if (proto->Spells[i].SpellCharges)
+                if (m_CastItem->GetSpellCharges(i)==0)
+                    return SPELL_FAILED_NO_CHARGES_REMAIN;
+
+        // consumable cast item checks
+        if (proto->Class == ITEM_CLASS_CONSUMABLE && m_targets.getUnitTarget())
         {
-            ItemPrototype const *proto = m_CastItem->GetProto();
-            if (!proto)
-                return SPELL_FAILED_ITEM_NOT_READY;
-
-            for (int i = 0; i<5; i++)
+            // such items should only fail if there is no suitable effect at all - see Rejuvenation Potions for example
+            SpellCastResult failReason = SPELL_CAST_OK;
+            for (int i = 0; i < 3; i++)
             {
-                if (proto->Spells[i].SpellCharges)
-                {
-                    if (m_CastItem->GetSpellCharges(i)==0)
-                        return SPELL_FAILED_NO_CHARGES_REMAIN;
-                }
-            }
+                // skip check, pet not required like checks, and for TARGET_PET m_targets.getUnitTarget() is not the real target but the caster
+                if (m_spellInfo->EffectImplicitTargetA[i] == TARGET_UNIT_PET)
+                    continue;
 
-            uint32 ItemClass = proto->Class;
-            if (ItemClass == ITEM_CLASS_CONSUMABLE && m_targets.getUnitTarget())
-            {
-                // such items should only fail if there is no suitable effect at all - see Rejuvenation Potions for example
-                uint8 failReason = 0;
-                for (int i = 0; i < 3; i++)
+                if (m_spellInfo->Effect[i] == SPELL_EFFECT_HEAL)
                 {
-                    // skip check, pet not required like checks, and for TARGET_UNIT_PET m_targets.getUnitTarget() is not the real target but the caster
-                    if (m_spellInfo->EffectImplicitTargetA[i] == TARGET_UNIT_PET)
+                    if (m_targets.getUnitTarget()->GetHealth() == m_targets.getUnitTarget()->GetMaxHealth())
+                    {
+                        failReason = SPELL_FAILED_ALREADY_AT_FULL_HEALTH;
                         continue;
-
-                    if (m_spellInfo->Effect[i] == SPELL_EFFECT_HEAL)
-                    {
-                        if (m_targets.getUnitTarget()->GetHealth() == m_targets.getUnitTarget()->GetMaxHealth())
-                        {
-                            failReason = (uint8)SPELL_FAILED_ALREADY_AT_FULL_HEALTH;
-                            continue;
-                        }
-                        else
-                        {
-                            failReason = 0;
-                            break;
-                        }
                     }
-
-                    // Mana Potion, Rage Potion, Thistle Tea(Rogue), ...
-                    if (m_spellInfo->Effect[i] == SPELL_EFFECT_ENERGIZE)
+                    else
                     {
-                        if (m_spellInfo->EffectMiscValue[i] < 0 || m_spellInfo->EffectMiscValue[i] >= MAX_POWERS)
-                        {
-                            failReason = (uint8)SPELL_FAILED_ALREADY_AT_FULL_POWER;
-                            continue;
-                        }
-
-                        Powers power = Powers(m_spellInfo->EffectMiscValue[i]);
-                        if (m_targets.getUnitTarget()->GetPower(power) == m_targets.getUnitTarget()->GetMaxPower(power))
-                        {
-                            failReason = (uint8)SPELL_FAILED_ALREADY_AT_FULL_POWER;
-                            continue;
-                        }
-                        else
-                        {
-                            failReason = 0;
-                            break;
-                        }
+                        failReason = SPELL_CAST_OK;
+                        break;
                     }
                 }
-                if (failReason)
-                    return failReason;
+
+                // Mana Potion, Rage Potion, Thistle Tea(Rogue), ...
+                if (m_spellInfo->Effect[i] == SPELL_EFFECT_ENERGIZE)
+                {
+                    if (m_spellInfo->EffectMiscValue[i] < 0 || m_spellInfo->EffectMiscValue[i] >= MAX_POWERS)
+                    {
+                        failReason = SPELL_FAILED_ALREADY_AT_FULL_POWER;
+                        continue;
+                    }
+
+                    Powers power = Powers(m_spellInfo->EffectMiscValue[i]);
+                    if (m_targets.getUnitTarget()->GetPower(power) == m_targets.getUnitTarget()->GetMaxPower(power))
+                    {
+                        failReason = SPELL_FAILED_ALREADY_AT_FULL_POWER;
+                        continue;
+                    }
+                    else
+                    {
+                        failReason = SPELL_CAST_OK;
+                        break;
+                    }
+                }
             }
+            if (failReason != SPELL_CAST_OK)
+                return failReason;
         }
     }
 
+    // check target item
     if (m_targets.getItemTargetGUID())
     {
         if (m_caster->GetTypeId() != TYPEID_PLAYER)
@@ -4895,6 +4805,7 @@ uint8 Spell::CheckItems()
             return SPELL_FAILED_EQUIPPED_ITEM_CLASS;
     }
 
+    // check spell focus object
     if (m_spellInfo->RequiresSpellFocus)
     {
         GameObject* ok = NULL;
@@ -4904,21 +4815,21 @@ uint8 Spell::CheckItems()
         Cell::VisitGridObjects(m_caster, checker, m_caster->GetMap()->GetVisibilityDistance());
 
         if (!ok)
-            return (uint8)SPELL_FAILED_REQUIRES_SPELL_FOCUS;
+            return SPELL_FAILED_REQUIRES_SPELL_FOCUS;
 
         focusObject = ok;                                   // game object found in range
     }
 
-    if (!(m_spellInfo->AttributesEx5 & SPELL_ATTR_EX5_NO_REAGENT_WHILE_PREP &&
-        m_caster->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PREPARATION)))
+    // check reagents (ignore triggered spells with reagents processed by original spell) and special reagent ignore case.
+    if (!m_IsTriggeredSpell && !p_caster->CanNoReagentCast(m_spellInfo))
     {
         for (uint32 i=0;i<8;i++)
         {
             if (m_spellInfo->Reagent[i] <= 0)
                 continue;
 
-            itemid    = m_spellInfo->Reagent[i];
-            itemcount = m_spellInfo->ReagentCount[i];
+            uint32 itemid    = m_spellInfo->Reagent[i];
+            uint32 itemcount = m_spellInfo->ReagentCount[i];
 
             // if CastItem is also spell reagent
             if (m_CastItem && m_CastItem->GetEntry() == itemid)
@@ -4926,7 +4837,7 @@ uint8 Spell::CheckItems()
                 ItemPrototype const *proto = m_CastItem->GetProto();
                 if (!proto)
                     return SPELL_FAILED_ITEM_NOT_READY;
-                for (int s=0;s<5;s++)
+                for (int s = 0; s < MAX_ITEM_PROTO_SPELLS; ++s)
                 {
                     // CastItem will be used up and does not count as reagent
                     int32 charges = m_CastItem->GetSpellCharges(s);
@@ -4938,12 +4849,13 @@ uint8 Spell::CheckItems()
                 }
             }
             if (!p_caster->HasItemCount(itemid,itemcount))
-                return (uint8)SPELL_FAILED_ITEM_NOT_READY;      //0x54
+                return SPELL_FAILED_ITEM_NOT_READY;         //0x54
         }
     }
 
+    // check totem-item requirements (items presence in inventory)
     uint32 totems = 2;
-    for (int i=0;i<2;++i)
+    for (int i = 0; i < 2; ++i)
     {
         if (m_spellInfo->Totem[i] != 0)
         {
@@ -4956,9 +4868,9 @@ uint8 Spell::CheckItems()
         totems -= 1;
     }
     if (totems != 0)
-        return (uint8)SPELL_FAILED_TOTEMS;                  //0x7C
+        return SPELL_FAILED_TOTEMS;                     //0x7C
 
-    //Check items for TotemCategory
+    // Check items for TotemCategory  (items presence in inventory)
     uint32 TotemCategory = 2;
     for (int i=0;i<2;++i)
     {
@@ -4974,8 +4886,9 @@ uint8 Spell::CheckItems()
             TotemCategory -= 1;
     }
     if (TotemCategory != 0)
-        return (uint8)SPELL_FAILED_TOTEM_CATEGORY;          //0x7B
+        return SPELL_FAILED_TOTEM_CATEGORY;             //0x7B
 
+    // special checks for spell effects
     for (int i = 0; i < 3; i++)
     {
         switch (m_spellInfo->Effect[i])
@@ -5153,7 +5066,7 @@ uint8 Spell::CheckItems()
         }
     }
 
-    return uint8(0);
+    return SPELL_CAST_OK;
 }
 
 void Spell::Delayed() // only called in DealDamage()
@@ -5618,6 +5531,68 @@ void SpellEvent::Abort(uint64 /*e_time*/)
 bool SpellEvent::IsDeletable() const
 {
     return m_Spell->IsDeletable();
+}
+
+SpellCastResult Spell::CanOpenLock(uint32 effIndex, uint32 lockId, SkillType& skillId, int32& reqSkillValue, int32& skillValue)
+{
+    if (!lockId)                                             // possible case for GO and maybe for items.
+        return SPELL_CAST_OK;
+
+    // Get LockInfo
+    LockEntry const *lockInfo = sLockStore.LookupEntry(lockId);
+
+    if (!lockInfo)
+        return SPELL_FAILED_BAD_TARGETS;
+
+    bool reqKey = false;                                    // some locks not have reqs
+
+    for (int j = 0; j < 8; ++j)
+    {
+        switch (lockInfo->Type[j])
+        {
+            // check key item (many fit cases can be)
+            case LOCK_KEY_ITEM:
+                if(lockInfo->Index[j] && m_CastItem && m_CastItem->GetEntry()==lockInfo->Index[j])
+                    return SPELL_CAST_OK;
+                reqKey = true;
+                break;
+                // check key skill (only single first fit case can be)
+            case LOCK_KEY_SKILL:
+            {
+                reqKey = true;
+
+                // wrong locktype, skip
+                if (uint32(m_spellInfo->EffectMiscValue[effIndex]) != lockInfo->Index[j])
+                    continue;
+
+                skillId = SkillByLockType(LockType(lockInfo->Index[j]));
+
+                if (skillId != SKILL_NONE)
+                {
+                    // skill bonus provided by casting spell (mostly item spells)
+                    // add the damage modifier from the spell casted (cheat lock / skeleton key etc.) (use m_currentBasePoints, CalculateDamage returns wrong value)
+                    uint32 spellSkillBonus = uint32(m_currentBasePoints[effIndex]+1);
+                    reqSkillValue = lockInfo->Skill[j];
+
+                    // castitem check: rogue using skeleton keys. the skill values should not be added in this case.
+                    skillValue = m_CastItem || m_caster->GetTypeId()!= TYPEID_PLAYER ?
+                        0 : ((Player*)m_caster)->GetSkillValue(skillId);
+
+                    skillValue += spellSkillBonus;
+
+                    if (skillValue < reqSkillValue)
+                        return SPELL_FAILED_LOW_CASTLEVEL;
+                }
+
+                return SPELL_CAST_OK;
+            }
+        }
+    }
+
+    if (reqKey)
+        return SPELL_FAILED_BAD_TARGETS;
+
+    return SPELL_CAST_OK;
 }
 
 bool Spell::IsValidSingleTargetEffect(Unit const* target, Targets type) const

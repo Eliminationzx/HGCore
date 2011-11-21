@@ -241,7 +241,7 @@ struct TRINITY_DLL_SPEC LanguageDesc
 extern LanguageDesc lang_description[LANGUAGES_COUNT];
 TRINITY_DLL_SPEC LanguageDesc const* GetLanguageDescByID(uint32 lang);
 
-class ObjectMgr
+class TRINITY_DLL_DECL ObjectMgr
 {
     public:
         ObjectMgr();
@@ -364,19 +364,18 @@ class ObjectMgr
                 return itr->second;
             return 0;
         }
-        bool IsTavernAreaTrigger(uint32 Trigger_ID) const { return mTavernAreaTriggerSet.count(Trigger_ID) != 0; }
-        bool IsGameObjectForQuests(uint32 entry) const { return mGameObjectForQuestSet.count(entry) != 0; }
 
-        uint32 GetBattleMasterBG(uint32 entry) const
+        bool IsTavernAreaTrigger(uint32 Trigger_ID) const
         {
-            BattleMastersMap::const_iterator itr = mBattleMastersMap.find(entry);
-            if (itr != mBattleMastersMap.end())
-                return itr->second;
-            return 2;                                       //BATTLEGROUND_WS - i will not add include only for constant usage!
+            return mTavernAreaTriggerSet.find(Trigger_ID) != mTavernAreaTriggerSet.end();
         }
 
-        void AddGossipText(GossipText *pGText);
-        GossipText *GetGossipText(uint32 Text_ID);
+        bool IsGameObjectForQuests(uint32 entry) const
+        {
+            return mGameObjectForQuestSet.find(entry) != mGameObjectForQuestSet.end();
+        }
+
+        GossipText const * GetGossipText(uint32 Text_ID) const;
 
         WorldSafeLocsEntry const *GetClosestGraveYard(float x, float y, float z, uint32 MapId, uint32 team);
         bool AddGraveYardLink(uint32 id, uint32 zone, uint32 team, bool inDB = true);
@@ -476,7 +475,6 @@ class ObjectMgr
         void LoadAccessRequirements();
         void LoadQuestAreaTriggers();
         void LoadTavernAreaTriggers();
-        void LoadBattleMastersEntry();
         void LoadGameObjectForQuests();
 
         void LoadItemTexts();
@@ -764,9 +762,8 @@ class ObjectMgr
 
         QuestMap            mQuestTemplates;
 
-        typedef UNORDERED_MAP<uint32, GossipText*> GossipTextMap;
+        typedef UNORDERED_MAP<uint32, GossipText> GossipTextMap;
         typedef UNORDERED_MAP<uint32, uint32> QuestAreaTriggerMap;
-        typedef UNORDERED_MAP<uint32, uint32> BattleMastersMap;
         typedef UNORDERED_MAP<uint32, std::string> ItemTextMap;
         typedef std::set<uint32> TavernAreaTriggerSet;
         typedef std::set<uint32> GameObjectForQuestSet;
@@ -775,12 +772,9 @@ class ObjectMgr
         GuildMap            mGuildMap;
         ArenaTeamMap        mArenaTeamMap;
 
-        ItemMap             mItems;
-
         ItemTextMap         mItemTexts;
 
         QuestAreaTriggerMap mQuestAreaTriggerMap;
-        BattleMastersMap    mBattleMastersMap;
         TavernAreaTriggerSet mTavernAreaTriggerSet;
         GameObjectForQuestSet mGameObjectForQuestSet;
         GossipTextMap       mGossipText;

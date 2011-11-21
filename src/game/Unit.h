@@ -535,9 +535,10 @@ enum UnitFlags
 // Value masks for UNIT_FIELD_FLAGS_2
 enum UnitFlags2
 {
-    UNIT_FLAG2_FEIGN_DEATH    = 0x00000001,
-    UNIT_FLAG2_COMPREHEND_LANG= 0x00000008,
-    UNIT_FLAG2_FORCE_MOVE     = 0x00000040
+    UNIT_FLAG2_FEIGN_DEATH      = 0x00000001,
+    UNIT_FLAG2_COMPREHEND_LANG  = 0x00000008,
+    UNIT_FLAG2_FORCE_MOVE       = 0x00000040,
+    UNIT_FLAG2_UNKNOWN1         = 0x00000800
 };
 
 /// Non Player Character flags
@@ -837,7 +838,7 @@ private:
 class CastSpellEvent : public BasicEvent
 {
     public:
-        CastSpellEvent(Unit& owner, uint64 target, uint32 spellId, bool triggered = false, uint64 orginalCaster = 0) : 
+        CastSpellEvent(Unit& owner, uint64 target, uint32 spellId, bool triggered = false, uint64 orginalCaster = 0) :
             BasicEvent(), m_owner(owner), m_target(target),  m_spellId(spellId), m_triggered(triggered), m_orginalCaster(orginalCaster), m_custom(false) { }
         CastSpellEvent(Unit& owner, uint64 target, uint32 spellId, int32* bp0, int32* bp1, int32* bp2, bool triggered = false, uint64 orginalCaster = 0);
 
@@ -1323,6 +1324,7 @@ class TRINITY_DLL_SPEC Unit : public WorldObject
             return (Unit*)this;
         }
         Player* GetCharmerOrOwnerPlayerOrPlayerItself() const;
+        float GetCombatDistance(const Unit* target) const;
 
         void SetPet(Pet* pet);
         void SetCharm(Unit* pet);
@@ -1417,7 +1419,7 @@ class TRINITY_DLL_SPEC Unit : public WorldObject
         virtual void ProhibitSpellScholl(SpellSchoolMask /*idSchoolMask*/, uint32 /*unTimeMs*/) { }
         void InterruptSpell(uint32 spellType, bool withDelayed = true, bool withInstant = true);
         void FinishSpell(CurrentSpellTypes spellType, bool ok = true);
-        
+
         // set withDelayed to true to account delayed spells as casted
         // delayed+channeled spells are always accounted as casted
         // we can skip channeled or delayed checks using flags
@@ -1439,6 +1441,8 @@ class TRINITY_DLL_SPEC Unit : public WorldObject
         uint32 m_invisibilityMask;
         uint32 m_ShapeShiftFormSpellId;
         ShapeshiftForm m_form;
+        bool IsInFeralForm(bool checkGhostWolf = false) const { return m_form == FORM_CAT || m_form == FORM_BEAR || m_form == FORM_DIREBEAR || (checkGhostWolf && m_form == FORM_GHOSTWOLF); }
+
         float m_modMeleeHitChance;
         float m_modRangedHitChance;
         float m_modSpellHitChance;
@@ -1551,16 +1555,20 @@ class TRINITY_DLL_SPEC Unit : public WorldObject
         void SetNativeDisplayId(uint32 modelId) { SetUInt32Value(UNIT_FIELD_NATIVEDISPLAYID, modelId); }
         void setTransForm(uint32 spellid) { m_transform = spellid;}
         uint32 getTransForm() const { return m_transform;}
+
+        DynamicObject* GetDynObject(uint32 spellId, uint32 effIndex);
+        DynamicObject* GetDynObject(uint32 spellId);
         void AddDynObject(DynamicObject* dynObj);
         void RemoveDynObject(uint32 spellid);
         void RemoveDynObjectWithGUID(uint64 guid) { m_dynObjGUIDs.remove(guid); }
         void RemoveAllDynObjects();
+
+        GameObject* GetGameObject(uint32 spellId) const;
         void AddGameObject(GameObject* gameObj);
         void RemoveGameObject(GameObject* gameObj, bool del);
         void RemoveGameObject(uint32 spellid, bool del);
         void RemoveAllGameObjects();
-        DynamicObject *GetDynObject(uint32 spellId, uint32 effIndex);
-        DynamicObject *GetDynObject(uint32 spellId);
+
         uint32 CalculateDamage(WeaponAttackType attType, bool normalized);
         float GetAPMultiplier(WeaponAttackType attType, bool normalized);
         void ModifyAuraState(AuraState flag, bool apply);
@@ -1622,6 +1630,7 @@ class TRINITY_DLL_SPEC Unit : public WorldObject
 
         Unit* GetUnit(uint64 guid);
         Creature* GetCreature(uint64 guid);
+        Player* GetPlayerByName(const char *name);
 
         MotionMaster* GetMotionMaster() { return &i_motionMaster; }
 
@@ -1652,7 +1661,7 @@ class TRINITY_DLL_SPEC Unit : public WorldObject
         void ClearComboPointHolders();
 
         ///----------Pet responses methods-----------------
-        void SendPetCastFail(uint32 spellid, uint8 msg);
+        void SendPetCastFail(uint32 spellid, SpellCastResult msg);
         void SendPetActionFeedback (uint8 msg);
         void SendPetTalk (uint32 pettalk);
         void SendPetSpellCooldown (uint32 spellid, time_t cooltime);
@@ -1724,7 +1733,8 @@ class TRINITY_DLL_SPEC Unit : public WorldObject
         typedef std::list<uint64> DynObjectGUIDs;
         DynObjectGUIDs m_dynObjGUIDs;
 
-        std::list<GameObject*> m_gameObj;
+        typedef std::list<GameObject*> GameObjectList;
+        GameObjectList m_gameObj;
         bool m_isSorted;
         uint32 m_transform;
         AuraList m_removedAuras;
@@ -1753,6 +1763,7 @@ class TRINITY_DLL_SPEC Unit : public WorldObject
         uint32 m_unit_movement_flags;
 
         uint32 m_reactiveTimer[MAX_REACTIVE];
+        uint32 m_regenTimer;
 
         ThreatManager m_ThreatManager;
 

@@ -420,7 +420,7 @@ int32 CompareAuraRanks(uint32 spellId_1, uint32 effIndex_1, uint32 spellId_2, ui
     if (spellId_1 == spellId_2) return 0;
 
     int32 diff = spellInfo_1->EffectBasePoints[effIndex_1] - spellInfo_2->EffectBasePoints[effIndex_2];
-    if (spellInfo_1->EffectBasePoints[effIndex_1]+1 < 0 && spellInfo_2->EffectBasePoints[effIndex_2]+1 < 0) return -diff;
+    if (spellInfo_1->CalculateSimpleValue(effIndex_1) < 0 && spellInfo_2->CalculateSimpleValue(effIndex_2) < 0) return -diff;
     else return diff;
 }
 
@@ -572,7 +572,7 @@ SpellSpecific GetSpellSpecific(uint32 spellId)
     return SPELL_NORMAL;
 }
 
-bool IsSingleFromSpellSpecificPerCaster(uint32 spellSpec1,uint32 spellSpec2)
+bool IsSingleFromSpellSpecificPerCaster(SpellSpecific spellSpec1,SpellSpecific spellSpec2)
 {
     switch (spellSpec1)
     {
@@ -585,13 +585,13 @@ bool IsSingleFromSpellSpecificPerCaster(uint32 spellSpec1,uint32 spellSpec2)
         case SPELL_POSITIVE_SHOUT:
         case SPELL_JUDGEMENT:
         case SPELL_WARLOCK_CORRUPTION:
-            return spellSpec1==spellSpec2;
+            return spellSpec1 == spellSpec2;
         default:
             return false;
     }
 }
 
-bool IsSingleFromSpellSpecificPerTarget(uint32 spellSpec1,uint32 spellSpec2)
+bool IsSingleFromSpellSpecificPerTarget(SpellSpecific spellSpec1, SpellSpecific spellSpec2)
 {
     switch (spellSpec1)
     {
@@ -605,17 +605,30 @@ bool IsSingleFromSpellSpecificPerTarget(uint32 spellSpec1,uint32 spellSpec2)
         case SPELL_FOOD:
         case SPELL_CHARM:
         case SPELL_WARRIOR_ENRAGE:
-            return spellSpec1==spellSpec2;
+            return spellSpec1 == spellSpec2;
         case SPELL_BATTLE_ELIXIR:
-            return spellSpec2==SPELL_BATTLE_ELIXIR
-                || spellSpec2==SPELL_FLASK_ELIXIR;
+            return spellSpec2 == SPELL_BATTLE_ELIXIR
+                || spellSpec2 == SPELL_FLASK_ELIXIR;
         case SPELL_GUARDIAN_ELIXIR:
-            return spellSpec2==SPELL_GUARDIAN_ELIXIR
-                || spellSpec2==SPELL_FLASK_ELIXIR;
+            return spellSpec2 == SPELL_GUARDIAN_ELIXIR
+                || spellSpec2 == SPELL_FLASK_ELIXIR;
         case SPELL_FLASK_ELIXIR:
-            return spellSpec2==SPELL_BATTLE_ELIXIR
-                || spellSpec2==SPELL_GUARDIAN_ELIXIR
-                || spellSpec2==SPELL_FLASK_ELIXIR;
+            return spellSpec2 == SPELL_BATTLE_ELIXIR
+                || spellSpec2 == SPELL_GUARDIAN_ELIXIR
+                || spellSpec2 == SPELL_FLASK_ELIXIR;
+        default:
+            return false;
+    }
+}
+
+bool IsSingleFromSpellSpecificRanksPerTarget(SpellSpecific spellId_spec, SpellSpecific i_spellId_spec)
+{
+    switch (spellId_spec)
+    {
+        case SPELL_BLESSING:
+        case SPELL_AURA:
+        case SPELL_CURSE:
+            return spellId_spec == i_spellId_spec;
         default:
             return false;
     }
@@ -715,6 +728,7 @@ bool IsPositiveEffect(uint32 spellId, uint32 effIndex)
                     {
                         case 13139:                         // net-o-matic special effect
                         case 23445:                         // evil twin
+                        case 35679:                         // Protectorate Demolitionist
                         case 38637:                         // Nether Exhaustion (red)
                         case 38638:                         // Nether Exhaustion (green)
                         case 38639:                         // Nether Exhaustion (blue)
@@ -726,7 +740,7 @@ bool IsPositiveEffect(uint32 spellId, uint32 effIndex)
                 case SPELL_AURA_MOD_STAT:
                 case SPELL_AURA_MOD_DAMAGE_DONE:            // dependent from bas point sign (negative -> negative)
                 case SPELL_AURA_MOD_HEALING_DONE:
-                    if (spellproto->EffectBasePoints[effIndex]+int32(spellproto->EffectBaseDice[effIndex]) < 0)
+                    if (spellproto->CalculateSimpleValue(effIndex) < 0)
                         return false;
                     break;
                 case SPELL_AURA_MOD_SPELL_CRIT_CHANCE:
@@ -827,7 +841,7 @@ bool IsPositiveEffect(uint32 spellId, uint32 effIndex)
                     switch (spellproto->EffectMiscValue[effIndex])
                     {
                         case SPELLMOD_COST:                 // dependent from bas point sign (negative -> positive)
-                            if (spellproto->EffectBasePoints[effIndex]+int32(spellproto->EffectBaseDice[effIndex]) > 0)
+                            if (spellproto->CalculateSimpleValue(effIndex) > 0)
                                 return false;
                             break;
                         default:
@@ -835,11 +849,11 @@ bool IsPositiveEffect(uint32 spellId, uint32 effIndex)
                     }
                 }   break;
                 case SPELL_AURA_MOD_HEALING_PCT:
-                    if (spellproto->EffectBasePoints[effIndex]+int32(spellproto->EffectBaseDice[effIndex]) < 0)
+                    if (spellproto->CalculateSimpleValue(effIndex) < 0)
                         return false;
                     break;
                 case SPELL_AURA_MOD_SKILL:
-                    if (spellproto->EffectBasePoints[effIndex]+int32(spellproto->EffectBaseDice[effIndex]) < 0)
+                    if (spellproto->CalculateSimpleValue(effIndex) < 0)
                         return false;
                     break;
                 case SPELL_AURA_FORCE_REACTION:
@@ -943,13 +957,13 @@ bool IsAuraAddedBySpell(uint32 auraType, uint32 spellId)
     return false;
 }
 
-uint8 GetErrorAtShapeshiftedCast (SpellEntry const *spellInfo, uint32 form)
+SpellCastResult GetErrorAtShapeshiftedCast (SpellEntry const *spellInfo, uint32 form)
 {
     // talents that learn spells can have stance requirements that need ignore
     // (this requirement only for client-side stance show in talent description)
     if (GetTalentSpellCost(spellInfo->Id) > 0 &&
         (spellInfo->Effect[0]==SPELL_EFFECT_LEARN_SPELL || spellInfo->Effect[1]==SPELL_EFFECT_LEARN_SPELL || spellInfo->Effect[2]==SPELL_EFFECT_LEARN_SPELL))
-        return 0;
+        return SPELL_CAST_OK;
 
     uint32 stanceMask = (form ? 1 << (form - 1) : 0);
 
@@ -957,7 +971,7 @@ uint8 GetErrorAtShapeshiftedCast (SpellEntry const *spellInfo, uint32 form)
         return SPELL_FAILED_NOT_SHAPESHIFT;
 
     if (stanceMask & spellInfo->Stances)                    // can explicitly be casted in this stance
-        return 0;
+        return SPELL_CAST_OK;
 
     bool actAsShifted = false;
     if (form > 0)
@@ -966,7 +980,7 @@ uint8 GetErrorAtShapeshiftedCast (SpellEntry const *spellInfo, uint32 form)
         if (!shapeInfo)
         {
             sLog.outError("GetErrorAtShapeshiftedCast: unknown shapeshift %u", form);
-            return 0;
+            return SPELL_CAST_OK;
         }
         actAsShifted = !(shapeInfo->flags1 & 1);            // shapeshift acts as normal form for spells
     }
@@ -985,7 +999,7 @@ uint8 GetErrorAtShapeshiftedCast (SpellEntry const *spellInfo, uint32 form)
             return SPELL_FAILED_ONLY_SHAPESHIFT;
     }
 
-    return 0;
+    return SPELL_CAST_OK;
 }
 
 bool IsBinaryResistable(SpellEntry const* spellInfo)
@@ -1757,7 +1771,8 @@ bool SpellMgr::IsNoStackSpellDueToSpell(uint32 spellId_1, uint32 spellId_2, bool
     SpellSpecific spellId_spec_2 = GetSpellSpecific(spellId_2);
     if (spellId_spec_1 && spellId_spec_2)
         if (IsSingleFromSpellSpecificPerTarget(spellId_spec_1, spellId_spec_2)
-            ||(IsSingleFromSpellSpecificPerCaster(spellId_spec_1, spellId_spec_2) && sameCaster))
+            ||(IsSingleFromSpellSpecificPerCaster(spellId_spec_1, spellId_spec_2) && sameCaster) ||
+            (IsSingleFromSpellSpecificRanksPerTarget(spellId_spec_1, spellId_spec_2) && IsRankSpellDueToSpell(spellInfo_1, spellId_spec_2)))
             return true;
 
     // spells with different specific always stack
@@ -2262,15 +2277,15 @@ void SpellMgr::LoadSpellLearnSkills()
 
         for (int i = 0; i < 3; ++i)
         {
-            if (entry->Effect[i]==SPELL_EFFECT_SKILL)
+            if (entry->Effect[i] == SPELL_EFFECT_SKILL)
             {
                 SpellLearnSkillNode dbc_node;
-                dbc_node.skill    = entry->EffectMiscValue[i];
+                dbc_node.skill = entry->EffectMiscValue[i];
                 if (dbc_node.skill != SKILL_RIDING)
-                    dbc_node.value    = 1;
+                    dbc_node.value = 1;
                 else
-                    dbc_node.value    = (entry->EffectBasePoints[i]+1)*75;
-                dbc_node.maxvalue = (entry->EffectBasePoints[i]+1)*75;
+                    dbc_node.value = entry->CalculateSimpleValue(i)*75;
+                dbc_node.maxvalue = entry->CalculateSimpleValue(i)*75;
 
                 SpellLearnSkillNode const* db_node = GetSpellLearnSkill(spell);
 
@@ -2577,7 +2592,7 @@ void SpellMgr::LoadSpellPetAuras()
                 continue;
             }
 
-            PetAura pa(pet, aura, spellInfo->EffectImplicitTargetA[i] == TARGET_UNIT_PET, spellInfo->EffectBasePoints[i] + spellInfo->EffectBaseDice[i]);
+            PetAura pa(pet, aura, spellInfo->EffectImplicitTargetA[i] == TARGET_UNIT_PET, spellInfo->CalculateSimpleValue(i));
             mSpellPetAuraMap[spell] = pa;
         }
 

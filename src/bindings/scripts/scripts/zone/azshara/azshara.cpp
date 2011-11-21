@@ -305,7 +305,7 @@ struct TRINITY_DLL_DECL mob_rizzle_sprysprocketAI : public ScriptedAI
                 if(map)
                 {
                     map->CreatureRelocation(m_creature, 3706.39, -3969.15, 35.9118, 0);
-                    m_creature->AI_SendMoveToPacket(3706.39, -3969.15, 35.9118, 0, 0, 0);
+                    m_creature->AI_SendMoveToPacket(3706.39, -3969.15, 35.9118, 0, 0, SPLINETYPE_NORMAL);
                 }
                 //begin swimming and summon depth charges
                 Player* player = Unit::GetPlayer(PlayerGUID);
@@ -604,9 +604,9 @@ bool GossipHello_npc_duke_hydraxis(Player *player, Creature *_Creature)
 
     if( player->GetQuestStatus(6824) == QUEST_STATUS_COMPLETE)
     {
-        if (player->GetReputationRank(749) == REP_HONORED)
+        if (player->GetReputationMgr().GetRank(749) == REP_HONORED)
             player->ADD_GOSSIP_ITEM(0, GOSSIP_AQ, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF);
-        else if (player->GetReputationRank(749) >= REP_REVERED)
+        else if (player->GetReputationMgr().GetRank(749) >= REP_REVERED)
             player->ADD_GOSSIP_ITEM(0, GOSSIP_ET, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+1);
     }
 
@@ -656,7 +656,7 @@ void AddSC_azshara()
     newscript->Name="mob_depth_charge";
     newscript->GetAI = &GetAI_mob_depth_charge;
     newscript->RegisterSelf();
-    
+
     newscript = new Script;
     newscript->Name="mob_spirit_of_azuregos";
     newscript->pGossipHello =  &GossipHello_mob_spirit_of_azuregos;
