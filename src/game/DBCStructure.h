@@ -195,9 +195,17 @@ struct CinematicSequencesEntry
 struct CreatureDisplayInfoEntry
 {
     uint32      Displayid;                                  // 0
-                                                            // 1-3,unused
+    int32       ModelId;                                    // 1
+                                                            // 2-3,unused
     float       scale;                                      // 4
                                                             // 5-13,unused
+};
+
+struct CreatureModelDataEntry
+{
+    uint32 ModelID;                                         // 0
+
+    float collision;                                        // 15
 };
 
 struct CreatureFamilyEntry
@@ -729,6 +737,15 @@ struct SpellEntry
 
     // helpers
     int32 CalculateSimpleValue(uint8 eff) const { return EffectBasePoints[eff]+int32(EffectBaseDice[eff]); }
+
+    bool HasApplyAura(uint32 aur)
+    {
+        for (uint8 i = 0 i < 3; ++i)
+            if (Effect[i] == SPELL_EFFECT_APPLY_AURA && EffectApplyAuraName[i] == aur)
+                return true;
+
+        return false;
+    }
 
     private:
         // prevent creating custom entries (copy data from original in fact)

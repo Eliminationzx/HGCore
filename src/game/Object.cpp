@@ -1374,8 +1374,13 @@ void WorldObject::GetRandomPoint(float x, float y, float z, float distance, floa
 }
 
 // this will find point in LOS before collision occur
-void WorldObject::GetValidPointInAngle(Position &pos, float dist, float angle)
+void WorldObject::GetValidPointInAngle(Position &pos, float dist, float angle, bool meAsSourcePos)
 {
+    angle += GetOrientation();
+
+    if (meAsSourcePos)
+        GetPosition(pos);
+
     Position dest;
     dest.x = pos.x + dist * cos(angle);
     dest.y = pos.y + dist * sin(angle);
