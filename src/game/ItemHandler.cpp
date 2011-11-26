@@ -21,7 +21,6 @@
 #include "Common.h"
 #include "WorldPacket.h"
 #include "WorldSession.h"
-#include "World.h"
 #include "Opcodes.h"
 #include "Log.h"
 #include "ObjectMgr.h"
@@ -202,7 +201,7 @@ void WorldSession::HandleAutoEquipItemOpcode(WorldPacket & recv_data)
 
         // check dest->src move possibility
         ItemPosCountVec sSrc;
-        uint16 eSrc;
+        uint16 eSrc = 0;
         if (_player->IsInventoryPos(src))
         {
             msg = _player->CanStoreItem(srcbag, srcslot, sSrc, pDstItem, true);
@@ -341,13 +340,13 @@ void WorldSession::HandleItemQuerySingleOpcode(WorldPacket & recv_data)
         data << pProto->Stackable;
         data << pProto->ContainerSlots;
 
-        for (int i = 0; i < 10; i++)
+        for (int i = 0; i < MAX_ITEM_PROTO_STATS; ++i)
         {
             data << pProto->ItemStat[i].ItemStatType;
             data << pProto->ItemStat[i].ItemStatValue;
         }
 
-        for (int i = 0; i < 5; i++)
+        for (int i = 0; i < MAX_ITEM_PROTO_DAMAGES; ++i)
         {
             data << pProto->Damage[i].DamageMin;
             data << pProto->Damage[i].DamageMax;
@@ -367,7 +366,7 @@ void WorldSession::HandleItemQuerySingleOpcode(WorldPacket & recv_data)
         data << pProto->AmmoType;
         data << pProto->RangedModRange;
 
-        for (int s = 0; s < 5; s++)
+        for (int s = 0; s < MAX_ITEM_PROTO_SPELLS; ++s)
         {
             // send DBC data for cooldowns in same way as it used in Spell::SendSpellCooldown
             // use `item_template` or if not set then only use spell cooldowns
@@ -421,7 +420,7 @@ void WorldSession::HandleItemQuerySingleOpcode(WorldPacket & recv_data)
         data << pProto->Map;                                // Added in 1.12.x & 2.0.1 client branch
         data << pProto->BagFamily;
         data << pProto->TotemCategory;
-        for (int s = 0; s < 3; s++)
+        for (int s = 0; s < MAX_ITEM_PROTO_SOCKETS; ++s)
         {
             data << pProto->Socket[s].Color;
             data << pProto->Socket[s].Content;
@@ -821,9 +820,21 @@ void WorldSession::HandleAutoStoreBagItemOpcode(WorldPacket & recv_data)
     _player->StoreItem(dest, pItem, true);
 }
 
-void WorldSession::HandleBuyBankSlotOpcode(WorldPacket& /*recvPacket*/)
+void WorldSession::HandleBuyBankSlotOpcode(WorldPacket& recvPacket)
 {
+    CHECK_PACKET_SIZE(recvPacket, 8);
     sLog.outDebug("WORLD: CMSG_BUY_BANK_SLOT");
+
+    uint64 guid;
+    recvPacket >> guid;
+
+    // cheating protection
+    Creature *pCreature = GetPlayer()->GetNPCIfCanInteractWith(guid, UNIT_NPC_FLAG_BANKER);
+    if (!pCreature)
+    {
+        sLog.outDebug("WORLD: HandleBuyBankSlotOpcode - Unit (GUID: %u) not found or you can't interact with him.", uint32(GUID_LOPART(guid)) );
+        return;
+    }
 
     uint32 slot = _player->GetByteValue(PLAYER_BYTES_2, 2);
 

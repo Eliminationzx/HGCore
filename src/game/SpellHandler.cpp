@@ -22,7 +22,6 @@
 #include "DBCStores.h"
 #include "WorldPacket.h"
 #include "WorldSession.h"
-#include "World.h"
 #include "ObjectMgr.h"
 #include "SpellMgr.h"
 #include "Log.h"
@@ -92,7 +91,7 @@ void WorldSession::HandleUseItemOpcode(WorldPacket& recvPacket)
 
     if (pUser->isInCombat())
     {
-        for (int i = 0; i < 5; ++i)
+        for (int i = 0; i < MAX_ITEM_PROTO_SPELLS; ++i)
         {
             if (SpellEntry const *spellInfo = sSpellStore.LookupEntry(proto->Spells[i].SpellId))
             {
@@ -121,7 +120,7 @@ void WorldSession::HandleUseItemOpcode(WorldPacket& recvPacket)
 
     if (!targets.getUnitTarget())
     {
-        for (int i = 0; i < 5; ++i)
+        for (int i = 0; i < MAX_ITEM_PROTO_SPELLS; ++i)
         {
             _Spell const& spellData = pItem->GetProto()->Spells[i];
             if (!spellData.SpellId)
@@ -265,7 +264,7 @@ void WorldSession::HandleOpenItemOpcode(WorldPacket& recvPacket)
         }
 
         // required picklocking
-        if (lockInfo->requiredlockskill || lockInfo->requiredminingskill)
+        if (lockInfo->Skill[1] || lockInfo->Skill[0])
         {
             pUser->SendEquipError(EQUIP_ERR_ITEM_LOCKED, pItem, NULL);
             return;
@@ -424,11 +423,9 @@ void WorldSession::HandleCancelAuraOpcode(WorldPacket& recvPacket)
     // channeled spell case (it currently casted then)
     if (IsChanneledSpell(spellInfo))
     {
-        if (Spell* spell = _player->m_currentSpells[CURRENT_CHANNELED_SPELL])
-        {
-            if (spell->m_spellInfo->Id == spellId)
-                _player->InterruptSpell(CURRENT_CHANNELED_SPELL);
-        }
+        if (_player->m_currentSpells[CURRENT_CHANNELED_SPELL] &&
+            _player->m_currentSpells[CURRENT_CHANNELED_SPELL]->m_spellInfo->Id==spellId)
+            _player->InterruptSpell(CURRENT_CHANNELED_SPELL);
         return;
     }
 

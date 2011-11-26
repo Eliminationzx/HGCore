@@ -29,16 +29,10 @@
 #include "ObjectGuid.h"
 #include "GridDefines.h"
 #include "Map.h"
+#include "SharedDefines.h"
 
 #include <set>
 #include <string>
-
-#define CONTACT_DISTANCE            0.5f
-#define INTERACTION_DISTANCE        5.0f
-#define MAX_VISIBILITY_DISTANCE     533.0f//333.0f      // max distance for visible object show, limited in 333 yards
-#define DEFAULT_VISIBILITY_DISTANCE 90.0f       // default visible distance, 90 yards on continents
-#define DEFAULT_VISIBILITY_INSTANCE 100.0f      // default visible distance in instances, 120 yards
-#define DEFAULT_VISIBILITY_BGARENAS 80.0f      // default visible distance in BG/Arenas, 180 yards
 
 #define DEFAULT_WORLD_OBJECT_SIZE   0.388999998569489f      // player size, also currently used (correctly?) for any non Unit world objects
 #define MAX_STEALTH_DETECT_RANGE    45.0f
@@ -464,7 +458,7 @@ class TRINITY_DLL_SPEC WorldObject : public Object//, public WorldLocation
         void UpdateAllowedPositionZ(float x, float y, float &z) const;
 
         void GetRandomPoint(float x, float y, float z, float distance, float &rand_x, float &rand_y, float &rand_z) const;
-        void GetValidPointInAngle(Position &pos, float dist, float angle);
+        void GetValidPointInAngle(Position &pos, float dist, float angle, bool meAsSourcePo);
 
         void SetMapId(uint32 newMap) { m_mapId = newMap; m_map = NULL; }
         uint32 GetMapId() const { return m_mapId; }
@@ -538,11 +532,10 @@ class TRINITY_DLL_SPEC WorldObject : public Object//, public WorldLocation
         float GetAngle(const float x, const float y) const;
         bool HasInArc(const float arcangle, const WorldObject* obj) const;
 
+        virtual void CleanupsBeforeDelete(); // used in destructor or explicitly before mass creature delete to remove cross-references to already deleted units
+
         virtual void SendMessageToSet(WorldPacket *data, bool self, bool to_possessor = true);
         virtual void SendMessageToSetInRange(WorldPacket *data, float dist, bool self, bool to_possessor = true);
-
-        bool IsBeingTeleported() { return mSemaphoreTeleport; }
-        void SetSemaphoreTeleport(bool semphsetting) { mSemaphoreTeleport = semphsetting; }
 
         void MonsterSay(const char* text, uint32 language, uint64 TargetGuid);
         void MonsterYell(const char* text, uint32 language, uint64 TargetGuid);
@@ -550,11 +543,14 @@ class TRINITY_DLL_SPEC WorldObject : public Object//, public WorldLocation
         void MonsterWhisper(const char* text, uint64 receiver, bool IsBossWhisper = false);
         void MonsterSay(int32 textId, uint32 language, uint64 TargetGuid);
         void MonsterYell(int32 textId, uint32 language, uint64 TargetGuid);
-        void MonsterYellToZone(int32 textId, uint32 language, uint64 TargetGuid);
         void MonsterTextEmote(int32 textId, uint64 TargetGuid, bool IsBossEmote = false, bool withoutPrename = false);
         void MonsterWhisper(int32 textId, uint64 receiver, bool IsBossWhisper = false);
+        void MonsterYellToZone(int32 textId, uint32 language, uint64 TargetGuid);
         void BuildMonsterChat(WorldPacket *data, uint8 msgtype, char const* text, uint32 language, char const* name, uint64 TargetGuid, bool withoutPrename = false) const;
         void BuildMonsterChat(WorldPacket *data, uint8 msgtype, int32 iTextEntry, uint32 language, char const* name, uint64 targetGuid, bool withoutPrename = false) const;
+
+        void PlayDistanceSound(uint32 sound_id, Player* target = NULL);
+        void PlayDirectSound(uint32 sound_id, Player* target = NULL);
 
         void SendObjectDeSpawnAnim(uint64 guid);
         void SendGameObjectCustomAnim(uint64 guid);
@@ -629,7 +625,6 @@ class TRINITY_DLL_SPEC WorldObject : public Object//, public WorldLocation
         uint16 m_notifyflags;
         uint16 m_executed_notifies;
 
-        bool mSemaphoreTeleport;
         WorldUpdateCounter m_updateTracker;
 };
 

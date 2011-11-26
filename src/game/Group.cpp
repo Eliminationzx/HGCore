@@ -78,8 +78,8 @@ Group::~Group()
     // this may unload some instance saves
     for (uint8 i = 0; i < TOTAL_DIFFICULTIES; i++)
     {
-        for (BoundInstancesMap::iterator itr = m_boundInstances[i].begin(); itr != m_boundInstances[i].end(); ++itr)
-            itr->second.save->RemoveGroup(this);
+        for (BoundInstancesMap::iterator itr2 = m_boundInstances[i].begin(); itr2 != m_boundInstances[i].end(); ++itr2)
+            itr2->second.save->RemoveGroup(this);
     }
 
     // Sub group counters clean up
@@ -1071,7 +1071,7 @@ void Group::Update(uint32 diff)
 
 void Group::UpdatePlayerOutOfRange(Player* pPlayer)
 {
-    if(!pPlayer || (!pPlayer->IsInWorld() && !pPlayer->IsBeingTeleported()))
+    if (!pPlayer || !pPlayer->IsInWorld())// && !pPlayer->IsBeingTeleported())) // is this needed ?
         return;
 
     Player *player;
@@ -1500,7 +1500,7 @@ void Group::UpdateLooterGuid(WorldObject* object, bool ifneed)
     SendUpdate();
 }
 
-uint32 Group::CanJoinBattleGroundQueue(uint32 bgTypeId, uint32 bgQueueType, uint32 MinPlayerCount, uint32 MaxPlayerCount, bool isRated, uint32 arenaSlot)
+uint32 Group::CanJoinBattleGroundQueue(BattleGroundTypeId bgTypeId, uint32 bgQueueType, uint32 MinPlayerCount, uint32 MaxPlayerCount, bool isRated, uint32 arenaSlot)
 {
     // check for min / max count
     uint32 memberscount = GetMembersCount();

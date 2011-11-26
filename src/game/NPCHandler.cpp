@@ -25,7 +25,6 @@
 #include "WorldSession.h"
 #include "Opcodes.h"
 #include "Log.h"
-#include "World.h"
 #include "ObjectMgr.h"
 #include "SpellMgr.h"
 #include "Player.h"
@@ -162,9 +161,9 @@ void WorldSession::SendTrainerList(uint64 guid, const std::string& strTitle)
     float fDiscountMod = _player->GetReputationPriceDiscount(unit);
 
     uint32 count = 0;
-    for (TrainerSpellList::const_iterator itr = trainer_spells->spellList.begin(); itr != trainer_spells->spellList.end(); ++itr)
+    for (TrainerSpellMap::const_iterator itr = trainer_spells->spellList.begin(); itr != trainer_spells->spellList.end(); ++itr)
     {
-        TrainerSpell const* tSpell = *itr;
+        TrainerSpell const* tSpell = &itr->second;
 
         if (!_player->IsSpellFitByClassAndRace(tSpell->spell))
             continue;
@@ -178,13 +177,13 @@ void WorldSession::SendTrainerList(uint64 guid, const std::string& strTitle)
 
         data << uint32(tSpell->spell);
         data << uint8(_player->GetTrainerSpellState(tSpell));
-        data << uint32(floor(tSpell->spellcost * fDiscountMod));
+        data << uint32(floor(tSpell->spellCost * fDiscountMod));
 
         data << uint32(primary_prof_first_rank ? 1 : 0);    // primary prof. learn confirmation dialog
         data << uint32(primary_prof_first_rank ? 1 : 0);    // must be equal prev. field to have learn button in enabled state
-        data << uint8(tSpell->reqlevel);
-        data << uint32(tSpell->reqskill);
-        data << uint32(tSpell->reqskillvalue);
+        data << uint8(tSpell->reqLevel);
+        data << uint32(tSpell->reqSkill);
+        data << uint32(tSpell->reqSkillValue);
         data << uint32(chain_node && chain_node->prev ? chain_node->prev : req_spell);
         data << uint32(chain_node && chain_node->prev ? req_spell : 0);
         data << uint32(0);
@@ -235,7 +234,7 @@ void WorldSession::HandleTrainerBuySpellOpcode(WorldPacket & recv_data)
         return;
 
     // apply reputation discount
-    uint32 nSpellCost = uint32(floor(trainer_spell->spellcost * _player->GetReputationPriceDiscount(unit)));
+    uint32 nSpellCost = uint32(floor(trainer_spell->spellCost * _player->GetReputationPriceDiscount(unit)));
 
     // check money requirement
     if (_player->GetMoney() < nSpellCost)
@@ -480,7 +479,6 @@ void WorldSession::SendBindPoint(Creature *npc)
     _player->PlayerTalkClass->CloseGossip();
 }
 
-//Need fix
 void WorldSession::HandleListStabledPetsOpcode(WorldPacket & recv_data)
 {
     CHECK_PACKET_SIZE(recv_data,8);
@@ -517,7 +515,9 @@ void WorldSession::SendStablePet(uint64 guid)
 
     Pet *pet = _player->GetPet();
 
+    size_t wpos = data.wpos();
     data << uint8(0);                                       // place holder for slot show number
+
     data << uint8(GetPlayer()->m_stableSlots);
 
     uint8 num = 0;                                          // counter for place holder
@@ -535,7 +535,8 @@ void WorldSession::SendStablePet(uint64 guid)
     }
 
     //                                                            0      1     2   3      4      5        6
-    QueryResultAutoPtr result = CharacterDatabase.PQuery("SELECT owner, slot, id, entry, level, loyalty, name FROM character_pet WHERE owner = '%u' AND slot > 0 AND slot < 3",_player->GetGUIDLow());
+    QueryResultAutoPtr result = CharacterDatabase.PQuery("SELECT owner, slot, id, entry, level, loyalty, name FROM character_pet WHERE owner = '%u' AND slot >= '%u' AND slot <= '%u' ORDER BY slot",
+                                                         _player->GetGUIDLow(), PET_SAVE_FIRST_STABLE_SLOT, PET_SAVE_LAST_STABLE_SLOT);
 
     if (result)
     {
@@ -554,7 +555,7 @@ void WorldSession::SendStablePet(uint64 guid)
         }while (result->NextRow());
     }
 
-    data.put<uint8>(8, num);                                // set real data to placeholder
+    data.put<uint8>(wpos, num);                                // set real data to placeholder
     SendPacket(&data);
 }
 
@@ -595,7 +596,8 @@ void WorldSession::HandleStablePet(WorldPacket & recv_data)
 
     uint32 free_slot = 1;
 
-    QueryResultAutoPtr result = CharacterDatabase.PQuery("SELECT owner,slot,id FROM character_pet WHERE owner = '%u'  AND slot > 0 AND slot < 3 ORDER BY slot ",_player->GetGUIDLow());
+    QueryResultAutoPtr result = CharacterDatabase.PQuery("SELECT owner,slot,id FROM character_pet WHERE owner = '%u'  AND slot >= '%u' AND slot <= '%u' ORDER BY slot ",
+                                                         _player->GetGUIDLow(), PET_SAVE_FIRST_STABLE_SLOT, PET_SAVE_LAST_STABLE_SLOT);
     if (result)
     {
         do
@@ -604,8 +606,12 @@ void WorldSession::HandleStablePet(WorldPacket & recv_data)
 
             uint32 slot = fields[1].GetUInt32();
 
-            if (slot==free_slot)                             // this slot not free
-                ++free_slot;
+            // slots ordered in query, and if not equal then free
+            if (slot != free_slot)
+                break;
+
+            // this slot not free, skip
+            ++free_slot;
         }while (result->NextRow());
     }
 
@@ -646,8 +652,7 @@ void WorldSession::HandleUnstablePet(WorldPacket & recv_data)
     Pet* pet = _player->GetPet();
     if (pet && pet->isAlive())
     {
-        uint8 i = 0x06;
-        data << uint8(i);
+        data << uint8(0x06);
         SendPacket(&data);
         return;
     }
@@ -658,7 +663,9 @@ void WorldSession::HandleUnstablePet(WorldPacket & recv_data)
 
     Pet *newpet = NULL;
 
-    QueryResultAutoPtr result = CharacterDatabase.PQuery("SELECT entry FROM character_pet WHERE owner = '%u' AND id = '%u' AND slot > 0 AND slot < 3",_player->GetGUIDLow(),petnumber);
+    QueryResultAutoPtr result = CharacterDatabase.PQuery("SELECT entry FROM character_pet WHERE owner = '%u' AND id = '%u' AND slot >='%u' AND slot <= '%u'",
+                                                         _player->GetGUIDLow(), petnumber, PET_SAVE_FIRST_STABLE_SLOT, PET_SAVE_LAST_STABLE_SLOT);
+
     if (result)
     {
         Field *fields = result->Fetch();
@@ -701,7 +708,7 @@ void WorldSession::HandleBuyStableSlot(WorldPacket & recv_data)
 
     WorldPacket data(SMSG_STABLE_RESULT, 200);
 
-    if (GetPlayer()->m_stableSlots < 2)                      // max slots amount = 2
+    if (GetPlayer()->m_stableSlots < MAX_PET_STABLES)
     {
         StableSlotPricesEntry const *SlotPrice = sStableSlotPricesStore.LookupEntry(GetPlayer()->m_stableSlots+1);
         if (_player->GetMoney() >= SlotPrice->Price)
@@ -753,7 +760,8 @@ void WorldSession::HandleStableSwapPet(WorldPacket & recv_data)
         return;
 
     // find swapped pet slot in stable
-    QueryResultAutoPtr result = CharacterDatabase.PQuery("SELECT slot,entry FROM character_pet WHERE owner = '%u' AND id = '%u'",_player->GetGUIDLow(),pet_number);
+    QueryResultAutoPtr result = CharacterDatabase.PQuery("SELECT slot,entry FROM character_pet WHERE owner = '%u' AND id = '%u'",
+                                                         _player->GetGUIDLow(), pet_number);
     if (!result)
         return;
 

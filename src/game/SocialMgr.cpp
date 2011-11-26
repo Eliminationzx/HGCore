@@ -29,6 +29,8 @@
 #include "World.h"
 #include "Util.h"
 
+#include "MapManager.h"
+
 INSTANTIATE_SINGLETON_1(SocialMgr);
 
 PlayerSocial::PlayerSocial()
@@ -224,7 +226,14 @@ void SocialMgr::GetFriendInfo(Player *player, uint32 friendGUID, FriendInfo &fri
             friendInfo.Status = FRIEND_STATUS_AFK;
         if (pFriend->isDND())
             friendInfo.Status = FRIEND_STATUS_DND;
+
         friendInfo.Area = pFriend->GetZoneId();
+        if (sWorld.getConfig(CONFIG_ENABLE_FAKE_WHO_ON_ARENA))
+        {
+            if (pFriend->InArena())
+                friendInfo.Area = sMapMgr.GetZoneId(pFriend->GetBattleGroundEntryPointMap(), pFriend->GetBattleGroundEntryPointX(), pFriend->GetBattleGroundEntryPointY(), pFriend->GetBattleGroundEntryPointZ());
+        }
+
         friendInfo.Level = pFriend->getLevel();
         friendInfo.Class = pFriend->getClass();
     }
@@ -282,7 +291,7 @@ void SocialMgr::BroadcastToFriendListers(Player *player, WorldPacket *packet)
 
     for (SocialMap::iterator itr = m_socialMap.begin(); itr != m_socialMap.end(); ++itr)
     {
-        PlayerSocialMap::iterator itr2 = itr->second.m_playerSocialMap.find(guid);
+        PlayerSocialMap::const_iterator itr2 = itr->second.m_playerSocialMap.find(guid);
         if (itr2 != itr->second.m_playerSocialMap.end() && (itr2->second.Flags & SOCIAL_FLAG_FRIEND))
         {
             Player *pFriend = ObjectAccessor::FindPlayer(MAKE_NEW_GUID(itr->first, 0, HIGHGUID_PLAYER));

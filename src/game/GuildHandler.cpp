@@ -310,7 +310,7 @@ void WorldSession::HandleGuildPromoteOpcode(WorldPacket& recvPacket)
         return;
     }
 
-    if (slot->RankId < 2 || (slot->RankId-1) < GetPlayer()->GetRank())
+    if (slot->RankId < 2 || ((slot->RankId-1) <= GetPlayer()->GetRank()))
         return;
 
     uint32 newRankId = slot->RankId < guild->GetNrRanks() ? slot->RankId-1 : guild->GetNrRanks()-1;
@@ -663,7 +663,7 @@ void WorldSession::HandleGuildRankOpcode(WorldPacket& recvPacket)
     guild->SetRankName(rankId, rankname);
 
     if (rankId==GR_GUILDMASTER)                              // prevent loss leader rights
-        rights |= GR_RIGHT_ALL;
+        rights = GR_RIGHT_ALL;
 
     guild->SetRankRights(rankId, rights);
 
@@ -1204,7 +1204,7 @@ void WorldSession::HandleGuildBankDepositItem(WorldPacket & recv_data)
             else                                            // swap
             {
                 gDest.clear();
-                uint8 msg = pGuild->CanStoreItem(BankTabDst,BankTabSlotDst,gDest,pItemSrc->GetCount(),pItemSrc,true);
+                msg = pGuild->CanStoreItem(BankTabDst,BankTabSlotDst,gDest,pItemSrc->GetCount(),pItemSrc,true);
                 if (msg != EQUIP_ERR_OK)
                 {
                     pl->SendEquipError(msg, pItemSrc, NULL);

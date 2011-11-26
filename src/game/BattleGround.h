@@ -22,13 +22,16 @@
 #define __BATTLEGROUND_H
 
 #include "Common.h"
-#include "WorldPacket.h"
-#include "WorldSession.h"
-#include "Opcodes.h"
-#include "ObjectMgr.h"
-#include "BattleGroundMgr.h"
 #include "SharedDefines.h"
 #include "MapManager.h"
+
+class Creature;
+class GameObject;
+class Group;
+class Player;
+class WorldPacket;
+
+struct WorldSafeLocsEntry;
 
 enum BattleGroundSounds
 {
@@ -130,21 +133,6 @@ struct BattleGroundObjectInfo
     uint32      spellid;
 };
 
-#define MAX_QUEUED_PLAYERS_MAP 7
-
-enum BattleGroundTypeId
-{
-    BATTLEGROUND_AV     = 1,
-    BATTLEGROUND_WS     = 2,
-    BATTLEGROUND_AB     = 3,
-    BATTLEGROUND_NA     = 4,
-    BATTLEGROUND_BE     = 5,
-    BATTLEGROUND_AA     = 6,
-    BATTLEGROUND_EY     = 7,
-    BATTLEGROUND_RL     = 8
-};
-#define MAX_BATTLEGROUND_TYPE_ID 8
-
 // handle the queue types and bg types separately to enable joining queue for different sized arenas at the same time
 enum BattleGroundQueueTypeId
 {
@@ -223,13 +211,19 @@ enum BattleGroundJoinError
     BG_JOIN_ERR_GROUP_NOT_ENOUGH = 9
 };
 
+enum ArenaSharedNPC
+{
+    ARENA_NPC_SPECTATOR = 0
+};
+
 class BattleGroundScore
 {
     public:
-        BattleGroundScore() : KillingBlows(0), HonorableKills(0), Deaths(0), DamageDone(0), HealingDone(0), BonusHonor(0) {};
-        virtual ~BattleGroundScore()                        //virtual destructor is used when deleting score from scores map
-        {
-        };
+        BattleGroundScore() : KillingBlows(0), Deaths(0), HonorableKills(0),
+            BonusHonor(0), DamageDone(0), HealingDone(0)
+        {}
+        virtual ~BattleGroundScore() {}                     //virtual destructor is used when deleting score from scores map
+
         uint32 KillingBlows;
         uint32 Deaths;
         uint32 HonorableKills;
@@ -252,7 +246,7 @@ This class is used to:
 3. some certain cases, same for all battlegrounds
 4. It has properties same for all battlegrounds
 */
-class BattleGround
+class TRINITY_DLL_SPEC BattleGround
 {
     friend class BattleGroundMgr;
 
@@ -275,7 +269,7 @@ class BattleGround
         /* Battleground */
         // Get methods:
         char const* GetName() const         { return m_Name; }
-        uint32 GetTypeID() const            { return m_TypeID; }
+        BattleGroundTypeId GetTypeID() const { return m_TypeID; }
         uint32 GetQueueType() const         { return m_Queue_type; }
         uint32 GetInstanceID() const        { return m_InstanceID; }
         uint32 GetStatus() const            { return m_Status; }
@@ -298,7 +292,7 @@ class BattleGround
 
         // Set methods:
         void SetName(char const* Name)      { m_Name = Name; }
-        void SetTypeID(uint32 TypeID)       { m_TypeID = TypeID; }
+        void SetTypeID(BattleGroundTypeId TypeID) { m_TypeID = TypeID; }
         void SetQueueType(uint32 ID)        { m_Queue_type = ID; }
         void SetInstanceID(uint32 InstanceID) { m_InstanceID = InstanceID; }
         void SetStatus(uint32 Status)       { m_Status = Status; }
@@ -399,13 +393,7 @@ class BattleGround
 
         /* Raid Group */
         Group *GetBgRaid(uint32 TeamID) const { return TeamID == ALLIANCE ? m_BgRaids[BG_TEAM_ALLIANCE] : m_BgRaids[BG_TEAM_HORDE]; }
-        void SetBgRaid(uint32 TeamID, Group *bg_raid)
-        {
-            Group* &old_raid = TeamID == ALLIANCE ? m_BgRaids[BG_TEAM_ALLIANCE] : m_BgRaids[BG_TEAM_HORDE];
-            if (old_raid) old_raid->SetBattlegroundGroup(NULL);
-            if (bg_raid) bg_raid->SetBattlegroundGroup(this);
-            old_raid = bg_raid;
-        }
+        void SetBgRaid(uint32 TeamID, Group *bg_raid);
 
         virtual void UpdatePlayerScore(Player *Source, uint32 type, uint32 value);
 
@@ -463,6 +451,7 @@ class BattleGround
         bool DelCreature(uint32 type);
         bool DelObject(uint32 type);
         bool AddSpiritGuide(uint32 type, float x, float y, float z, float o, uint32 team);
+        void AddSpectatorNPC(float x, float y, float z, float o);
         int32 GetObjectType(uint64 guid);
 
         void DoorOpen(uint32 type);
@@ -505,7 +494,7 @@ class BattleGround
         BGHonorMode m_HonorMode;
     private:
         /* Battleground */
-        uint32 m_TypeID;                                    //Battleground type, defined in enum BattleGroundTypeId
+        BattleGroundTypeId m_TypeID;
         uint32 m_InstanceID;                                //BattleGround Instance's GUID!
         uint32 m_Status;
         uint32 m_StartTime;

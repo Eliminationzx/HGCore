@@ -26,10 +26,12 @@
 #include "ObjectMgr.h"
 #include "MapManager.h"
 #include "Language.h"
+#include "WorldPacket.h"
 
 BattleGroundNA::BattleGroundNA()
 {
     m_BgObjects.resize(BG_NA_OBJECT_MAX);
+    m_BgCreatures.resize(BG_NA_CREATURE_MAX);
 }
 
 BattleGroundNA::~BattleGroundNA()

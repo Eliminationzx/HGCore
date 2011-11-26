@@ -225,7 +225,7 @@ void WorldSession::HandleWhoOpcode(WorldPacket & recv_data)
     bool allowTwoSideWhoList = sWorld.getConfig(CONFIG_ALLOW_TWO_SIDE_WHO_LIST);
     bool gmInWhoList         = sWorld.getConfig(CONFIG_GM_IN_WHO_LIST);
 
-    WorldPacket data(SMSG_WHO, 50);                       // guess size
+    WorldPacket data(SMSG_WHO, 50);                         // guess size
     data << clientcount;                                    // clientcount place holder
     data << clientcount;                                    // clientcount place holder
 
@@ -243,6 +243,10 @@ void WorldSession::HandleWhoOpcode(WorldPacket & recv_data)
             if ((itr->second->GetSession()->GetSecurity() > SEC_PLAYER && !gmInWhoList))
                 continue;
         }
+
+        //do not process players which are not in world
+        if (!(itr->second->IsInWorld()))
+            continue;
 
         // check if target is globally visible for player
         if (!(itr->second->IsVisibleGloballyfor (_player)))
@@ -264,6 +268,14 @@ void WorldSession::HandleWhoOpcode(WorldPacket & recv_data)
             continue;
 
         uint32 pzoneid = itr->second->GetZoneId();
+        if (sWorld.getConfig(CONFIG_ENABLE_FAKE_WHO_ON_ARENA))
+        {
+            if (itr->second->InArena())
+            {
+                Player *pPlayer = itr->second;
+                pzoneid = sMapMgr.GetZoneId(pPlayer->GetBattleGroundEntryPointMap(), pPlayer->GetBattleGroundEntryPointX(), pPlayer->GetBattleGroundEntryPointY(), pPlayer->GetBattleGroundEntryPointZ());
+            }
+        }
         uint8 gender = itr->second->getGender();
 
         bool z_show = true;
@@ -299,7 +311,7 @@ void WorldSession::HandleWhoOpcode(WorldPacket & recv_data)
             continue;
 
         std::string aname;
-        if (AreaTableEntry const* areaEntry = GetAreaEntryByAreaID(itr->second->GetZoneId()))
+        if (AreaTableEntry const* areaEntry = GetAreaEntryByAreaID(pzoneid))
             aname = areaEntry->area_name[GetSessionDbcLocale()];
 
         bool s_show = true;
@@ -322,7 +334,7 @@ void WorldSession::HandleWhoOpcode(WorldPacket & recv_data)
 
         data << pname;                                    // player name
         data << gname;                                    // guild name
-        data << uint32(lvl);                             // player level
+        data << uint32(lvl);                              // player level
         data << uint32(class_);                           // player class
         data << uint32(race);                             // player race
         data << uint8(gender);                            // player gender
@@ -485,7 +497,8 @@ void WorldSession::HandleSetTargetOpcode(WorldPacket & recv_data)
     if (!unit)
         return;
 
-    _player->SetFactionVisibleForFactionTemplateId(unit->getFaction());
+    if (FactionTemplateEntry const* factionTemplateEntry = sFactionTemplateStore.LookupEntry(unit->getFaction()))
+        _player->GetReputationMgr().SetVisible(factionTemplateEntry);
 }
 
 void WorldSession::HandleSetSelectionOpcode(WorldPacket & recv_data)
@@ -502,7 +515,8 @@ void WorldSession::HandleSetSelectionOpcode(WorldPacket & recv_data)
     if (!unit)
         return;
 
-    _player->SetFactionVisibleForFactionTemplateId(unit->getFaction());
+    if (FactionTemplateEntry const* factionTemplateEntry = sFactionTemplateStore.LookupEntry(unit->getFaction()))
+        _player->GetReputationMgr().SetVisible(factionTemplateEntry);
 }
 
 void WorldSession::HandleStandStateChangeOpcode(WorldPacket & recv_data)
@@ -985,7 +999,7 @@ void WorldSession::HandleCompleteCinema(WorldPacket & recv_data)
 
     uint32 Cinematic_ID = GetPlayer()->getWatchingCinematic();
 
-    CinematicSequenceEntry const* cinematic = sCinematicStore.LookupEntry(Cinematic_ID);
+    CinematicSequencesEntry const* cinematic = sCinematicSequencesStore.LookupEntry(Cinematic_ID);
 
     if (!cinematic)
     {
@@ -1249,14 +1263,6 @@ void WorldSession::HandleWorldTeleportOpcode(WorldPacket& recv_data)
     // Received opcode CMSG_WORLD_TELEPORT
     // Time is ***, map=469, x=452.000000, y=6454.000000, z=2536.000000, orient=3.141593
 
-    //sLog.outDebug("Received opcode CMSG_WORLD_TELEPORT");
-
-    if (GetPlayer()->IsTaxiFlying())
-    {
-        sLog.outDebug("Player '%s' (GUID: %u) in flight, ignore worldport command.",GetPlayer()->GetName(),GetPlayer()->GetGUIDLow());
-        return;
-    }
-
     uint32 time;
     uint32 mapid;
     float PositionX;
@@ -1270,6 +1276,15 @@ void WorldSession::HandleWorldTeleportOpcode(WorldPacket& recv_data)
     recv_data >> PositionY;
     recv_data >> PositionZ;
     recv_data >> Orientation;                               // o (3.141593 = 180 degrees)
+
+    //sLog.outDebug("Received opcode CMSG_WORLD_TELEPORT");
+
+    if (GetPlayer()->IsTaxiFlying())
+    {
+        sLog.outDebug("Player '%s' (GUID: %u) in flight, ignore worldport command.",GetPlayer()->GetName(),GetPlayer()->GetGUIDLow());
+        return;
+    }
+
     DEBUG_LOG("Time %u sec, map=%u, x=%f, y=%f, z=%f, orient=%f", time/1000, mapid, PositionX, PositionY, PositionZ, Orientation);
 
     if (GetSecurity() >= SEC_ADMINISTRATOR)
@@ -1344,7 +1359,10 @@ void WorldSession::HandleReportSpamOpcode(WorldPacket & recv_data)
 
     uint8 spam_type;                                        // 0 - mail, 1 - chat
     uint64 spammer_guid;
-    uint32 unk1, unk2, unk3, unk4 = 0;
+    uint32 unk1 = 0;
+    uint32 unk2 = 0;
+    uint32 unk3 = 0;
+    uint32 unk4 = 0;
     std::string description = "";
     recv_data >> spam_type;                                 // unk 0x01 const, may be spam type (mail/chat)
     recv_data >> spammer_guid;                              // player guid

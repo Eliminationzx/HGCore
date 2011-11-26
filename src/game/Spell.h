@@ -22,6 +22,7 @@
 #define __SPELL_H
 
 #include "GridDefines.h"
+#include "SharedDefines.h"
 
 #define MAX_SPELL_ID    60000
 
@@ -377,9 +378,9 @@ class Spell
         void TakeReagents();
         void TakeCastItem();
         void TriggerSpell();
-        uint8 CanCast(bool strict);
-        int16 PetCanCast(Unit* target);
-        bool CanAutoCast(Unit* target);
+
+        SpellCastResult CheckCast(bool strict);
+        SpellCastResult CheckPetCast(Unit* target);
 
         // handlers
         void handle_immediate();
@@ -388,10 +389,10 @@ class Spell
         void _handle_immediate_phase();
         void _handle_finish_phase();
 
-        uint8 CheckItems();
-        uint8 CheckRange(bool strict);
-        uint8 CheckPower();
-        uint8 CheckCasterAuras() const;
+        SpellCastResult CheckItems();
+        SpellCastResult CheckRange(bool strict);
+        SpellCastResult CheckPower();
+        SpellCastResult CheckCasterAuras() const;
 
         int32 CalculateDamage(uint8 i, Unit* target) { return m_caster->CalculateSpellDamage(m_spellInfo,i,m_currentBasePoints[i],target); }
 
@@ -412,12 +413,13 @@ class Spell
         Unit* SelectMagnetTarget();
         void HandleHitTriggerAura();
         bool CheckTarget(Unit* target, uint32 eff);
+        bool CanAutoCast(Unit* target);
         bool CanIgnoreNotAttackableFlags();
 
         void CheckSrc() { if (!m_targets.HasSrc()) m_targets.setSrc(m_caster); }
         void CheckDst() { if (!m_targets.HasDst()) m_targets.setDestination(m_caster); }
 
-        void SendCastResult(uint8 result);
+        void SendCastResult(SpellCastResult result);
         void SendSpellStart();
         void SendSpellGo();
         void SendSpellCooldown();
@@ -466,6 +468,18 @@ class Spell
         bool IsNeedSendToClient() const;
 
         CurrentSpellTypes GetCurrentContainer();
+
+        Player* GetPlayerForCastQuestCond()
+        {
+            if (m_caster->GetTypeId() == TYPEID_PLAYER)
+                return (Player*)m_caster;
+
+            if (Unit* u = m_caster->GetCharmerOrOwner())
+                if (u->GetTypeId() == TYPEID_PLAYER)
+                    return (Player*)u;
+
+            return NULL;
+        }
 
         Unit* GetCaster() const { return m_caster; }
         Unit* GetOriginalCaster() const { return m_originalCaster; }
@@ -599,6 +613,7 @@ class Spell
         void DoAllEffectOnTarget(GOTargetInfo *target);
         void DoAllEffectOnTarget(ItemTargetInfo *target);
         bool IsAliveUnitPresentInTargetList();
+        SpellCastResult CanOpenLock(uint32 effIndex, uint32 lockid, SkillType& skillid, int32& reqSkillValue, int32& skillValue);
         void SearchAreaTarget(std::list<Unit*> &unitList, float radius, const uint32 type, SpellTargets TargetType, uint32 entry = 0, SpellScriptTargetType spellScriptTargetType = SPELL_TARGET_TYPE_CREATURE);
         void SearchAreaTarget(std::list<GameObject*> &goList, float radius, const uint32 type, SpellTargets TargetType, uint32 entry = 0, SpellScriptTargetType spellScriptTargetType = SPELL_TARGET_TYPE_CREATURE);
         void SearchChainTarget(std::list<Unit*> &unitList, float radius, uint32 unMaxTargets, SpellTargets TargetType);

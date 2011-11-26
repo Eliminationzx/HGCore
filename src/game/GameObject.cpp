@@ -68,11 +68,14 @@ GameObject::GameObject() : WorldObject()
 
 GameObject::~GameObject()
 {
+    CleanupsBeforeDelete();
+}
+void GameObject::CleanupsBeforeDelete()
+{
     if (m_uint32Values)                                      // field array can be not exist if GameOBject not loaded
     {
         // crash possible at access to deleted GO in Unit::m_gameobj
-        uint64 owner_guid = GetOwnerGUID();
-        if (owner_guid)
+        if (uint64 owner_guid = GetOwnerGUID())
         {
             Unit* owner = NULL;
             if (IS_PLAYER_GUID(owner_guid))
@@ -170,12 +173,11 @@ bool GameObject::Create(uint32 guidlow, uint32 name_id, Map *map, float x, float
     SetFloatValue(GAMEOBJECT_POS_X, x);
     SetFloatValue(GAMEOBJECT_POS_Y, y);
     SetFloatValue(GAMEOBJECT_POS_Z, z);
-    SetFloatValue(GAMEOBJECT_FACING, ang);                  //this is not facing angle
 
-    SetFloatValue (GAMEOBJECT_ROTATION, rotation0);
-    SetFloatValue (GAMEOBJECT_ROTATION+1, rotation1);
-    SetFloatValue (GAMEOBJECT_ROTATION+2, rotation2);
-    SetFloatValue (GAMEOBJECT_ROTATION+3, rotation3);
+    SetFloatValue(GAMEOBJECT_ROTATION+0, rotation0);
+    SetFloatValue(GAMEOBJECT_ROTATION+1, rotation1);
+
+    UpdateRotationFields(rotation2, rotation3);              // GAMEOBJECT_FACING, GAMEOBJECT_ROTATION+2/3
 
     SetFloatValue(OBJECT_FIELD_SCALE_X, goinfo->size);
 
@@ -834,9 +836,6 @@ bool GameObject::isVisibleForInState(Player const* u, bool inVisibleList) const
     if (!viewPoint || !u->HasFarsightVision())
         viewPoint = u;
 
-//    if(GetEntry() == 188119)
-//        return true;
-//    else
     return IsWithinDistInMap(viewPoint, GetMap()->GetVisibilityDistance(const_cast<GameObject*>(this)) + (inVisibleList ? World::GetVisibleObjectGreyDistance() : 0.0f), false);
 }
 
@@ -1153,12 +1152,7 @@ void GameObject::Use(Unit* user)
             Player* player = (Player*)user;
 
             if (info->camera.cinematicId)
-            {
-                WorldPacket data(SMSG_TRIGGER_CINEMATIC, 4);
-                data << info->camera.cinematicId;
-                player->GetSession()->SendPacket(&data);
-                player->setWatchingCinematic(info->camera.cinematicId);
-            }
+                player->SendCinematicStart(info->camera.cinematicId);
             return;
         }
         //fishing bobber
@@ -1439,7 +1433,10 @@ void GameObject::CastSpell(Unit* target, uint32 spell)
 
     if(spell == 7353) // cozy fire, TODO: find general rule?
     {
-        trigger->setFaction(14);
+        if (Unit *owner = GetOwner())
+            trigger->setFaction(owner->getFaction());
+        else
+            trigger->setFaction(14);
         trigger->CastSpell(target, spell, true); // no orginal caster should prevent 'on spell cast' triggering
         return;
     }
@@ -1491,6 +1488,20 @@ const char* GameObject::GetNameForLocaleIdx(int32 loc_idx) const
     }
 
     return GetName();
+}
+
+void GameObject::UpdateRotationFields(float rotation2 /*=0.0f*/, float rotation3 /*=0.0f*/)
+{
+    SetFloatValue(GAMEOBJECT_FACING, GetOrientation());
+
+    if (rotation2==0.0f && rotation3==0.0f)
+    {
+        rotation2 = sin(GetOrientation()/2);
+        rotation3 = cos(GetOrientation()/2);
+    }
+
+    SetFloatValue(GAMEOBJECT_ROTATION+2, rotation2);
+    SetFloatValue(GAMEOBJECT_ROTATION+3, rotation3);
 }
 
 float GameObject::GetObjectBoundingRadius() const

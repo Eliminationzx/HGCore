@@ -163,7 +163,7 @@ void WorldSession::HandleCharEnumOpcode(WorldPacket & /*recv_data*/)
         "SELECT characters.guid, characters.data, characters.name, characters.position_x, characters.position_y, characters.position_z, characters.map, characters.totaltime, characters.leveltime, "
     //   9                    10                   11                     12                   13
         "characters.at_login, character_pet.entry, character_pet.modelid, character_pet.level, guild_member.guildid "
-        "FROM characters LEFT JOIN character_pet ON characters.guid=character_pet.owner AND character_pet.slot='0' "
+        "FROM characters LEFT JOIN character_pet ON characters.guid=character_pet.owner AND character_pet.slot='%u' "
         "LEFT JOIN guild_member ON characters.guid = guild_member.guid "
         "WHERE characters.account = '%u' ORDER BY characters.guid"
         :
@@ -172,11 +172,11 @@ void WorldSession::HandleCharEnumOpcode(WorldPacket & /*recv_data*/)
         "SELECT characters.guid, characters.data, characters.name, characters.position_x, characters.position_y, characters.position_z, characters.map, characters.totaltime, characters.leveltime, "
     //   9                    10                   11                     12                   13                    14
         "characters.at_login, character_pet.entry, character_pet.modelid, character_pet.level, guild_member.guildid, genitive "
-        "FROM characters LEFT JOIN character_pet ON characters.guid = character_pet.owner AND character_pet.slot='0' "
+        "FROM characters LEFT JOIN character_pet ON characters.guid = character_pet.owner AND character_pet.slot='%u' "
         "LEFT JOIN character_declinedname ON characters.guid = character_declinedname.guid "
         "LEFT JOIN guild_member ON characters.guid = guild_member.guid "
         "WHERE characters.account = '%u' ORDER BY characters.guid",
-        GetAccountId());
+        PET_SAVE_AS_CURRENT, GetAccountId());
 }
 
 void WorldSession::HandleCharCreateOpcode(WorldPacket & recv_data)
@@ -368,7 +368,7 @@ void WorldSession::HandleCharCreateOpcode(WorldPacket & recv_data)
         return;
     }
 
-    if (have_same_race && skipCinematics == 1 || skipCinematics == 2)
+    if ((have_same_race && skipCinematics == 1) || skipCinematics == 2)
         pNewChar->setCinematic(1);                          // not show intro
 
     // Player created, save it now
@@ -613,10 +613,7 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder * holder)
 
         if(ChrRacesEntry const* rEntry = sChrRacesStore.LookupEntry(pCurrChar->getRace()))
         {
-            data.Initialize(SMSG_TRIGGER_CINEMATIC,4);
-            data << uint32(rEntry->startmovie);
-            SendPacket(&data);
-            pCurrChar->setWatchingCinematic(rEntry->startmovie);
+            pCurrChar->SendCinematicStart(rEntry->CinematicSequence);
 
             // send new char string if not empty
             if (!sWorld.GetNewCharString().empty())
@@ -624,9 +621,9 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder * holder)
         }
     }
 
-    // normal delayed teleport protection not applied (and this correct) for this case (Player object just created)
     if (!pCurrChar->GetMap()->Add(pCurrChar))
     {
+        // normal delayed teleport protection not applied (and this correct) for this case (Player object just created)
         AreaTrigger const* at = objmgr.GetGoBackTrigger(pCurrChar->GetMapId());
         if (at)
             pCurrChar->TeleportTo(at->target_mapId, at->target_X, at->target_Y, at->target_Z, pCurrChar->GetOrientation());
@@ -719,9 +716,8 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder * holder)
         SendDoFlight(MountId, path, startNode);
     }
 
-    // Load pet if any and player is alive and not in taxi flight
-    if (pCurrChar->isAlive() && pCurrChar->m_taxi.GetTaxiSource()==0)
-        pCurrChar->LoadPet();
+    // Load pet if any (if player not alive and in taxi flight or another then pet will remember as temporary unsummoned)
+    pCurrChar->LoadPet();
 
     // Set FFA PvP for non GM in non-rest mode
     if (sWorld.IsFFAPvPRealm() && !pCurrChar->isGameMaster() && !pCurrChar->HasFlag(PLAYER_FLAGS,PLAYER_FLAGS_RESTING))
@@ -775,15 +771,7 @@ void WorldSession::HandleSetFactionAtWar(WorldPacket & recv_data)
     recv_data >> repListID;
     recv_data >> flag;
 
-    FactionStateList::iterator itr = GetPlayer()->m_factions.find(repListID);
-    if (itr == GetPlayer()->m_factions.end())
-        return;
-
-    // always invisible or hidden faction can't change war state
-    if (itr->second.Flags & (FACTION_FLAG_INVISIBLE_FORCED|FACTION_FLAG_HIDDEN))
-        return;
-
-    GetPlayer()->SetFactionAtWar(&itr->second,flag);
+    GetPlayer()->GetReputationMgr().SetAtWar(repListID,flag);
 }
 
 //I think this function is never used :/ I dunno, but i guess this opcode not exists
@@ -791,7 +779,7 @@ void WorldSession::HandleSetFactionCheat(WorldPacket & /*recv_data*/)
 {
     //CHECK_PACKET_SIZE(recv_data,4+4);
 
-    //sLog.outDebug("WORLD SESSION: HandleSetFactionCheat");
+    sLog.outError("WORLD SESSION: HandleSetFactionCheat, not expected call, please report.");
     /*
         uint32 FactionID;
         uint32 Standing;
@@ -811,7 +799,7 @@ void WorldSession::HandleSetFactionCheat(WorldPacket & /*recv_data*/)
             }
         }
     */
-    GetPlayer()->UpdateReputation();
+    GetPlayer()->GetReputationMgr().SendStates();
 }
 
 void WorldSession::HandleMeetingStoneInfo(WorldPacket & /*recv_data*/)
@@ -876,11 +864,7 @@ void WorldSession::HandleSetWatchedFactionInactiveOpcode(WorldPacket & recv_data
     uint8 inactive;
     recv_data >> replistid >> inactive;
 
-    FactionStateList::iterator itr = _player->m_factions.find(replistid);
-    if (itr == _player->m_factions.end())
-        return;
-
-    _player->SetFactionInactive(&itr->second, inactive);
+    _player->GetReputationMgr().SetInactive(replistid, inactive);
 }
 
 void WorldSession::HandleToggleHelmOpcode(WorldPacket & /*recv_data*/)

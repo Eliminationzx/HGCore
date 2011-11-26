@@ -36,7 +36,6 @@
 #include "MapManager.h"
 #include "InstanceData.h"
 #include "ObjectAccessor.h"
-#include "CreatureAI.h"
 #include "Formulas.h"
 #include "Pet.h"
 #include "Util.h"
@@ -238,7 +237,7 @@ CastSpellEvent::CastSpellEvent(Unit& owner, uint64 target, uint32 spellId, int32
         m_values.AddSpellMod(SPELLVALUE_BASE_POINT1, *bp1);
     if(bp2)
         m_values.AddSpellMod(SPELLVALUE_BASE_POINT2, *bp2);
-}    
+}
 
 
 
@@ -289,8 +288,8 @@ Unit::Unit()
 
     m_addDmgOnce = 0;
 
-    for (int i = 0; i < MAX_TOTEM; ++i)
-        m_TotemSlot[i]  = 0;
+    for (uint8 i = 0; i < MAX_TOTEM; ++i)
+        m_TotemSlot[i] = 0;
 
     m_ObjectSlot[0] = m_ObjectSlot[1] = m_ObjectSlot[2] = m_ObjectSlot[3] = 0;
     //m_Aura = NULL;
@@ -308,8 +307,9 @@ Unit::Unit()
     m_ShapeShiftFormSpellId = 0;
     m_canModifyStats = false;
 
-    for (int i = 0; i < MAX_SPELL_IMMUNITY; ++i)
+    for (uint8 i = 0; i < MAX_SPELL_IMMUNITY; ++i)
         m_spellImmune[i].clear();
+
     for (int i = 0; i < UNIT_MOD_END; ++i)
     {
         m_auraModifiersGroup[i][BASE_VALUE] = 0.0f;
@@ -320,12 +320,13 @@ Unit::Unit()
                                                             // implement 50% base damage from offhand
     m_auraModifiersGroup[UNIT_MOD_DAMAGE_OFFHAND][TOTAL_PCT] = 0.5f;
 
-    for (int i = 0; i < 3; i++)
+    for (uint8 i = 0; i < MAX_ATTACK; i++)
     {
         m_weaponDamage[i][MINDAMAGE] = BASE_MINDAMAGE;
         m_weaponDamage[i][MAXDAMAGE] = BASE_MAXDAMAGE;
     }
-    for (int i = 0; i < MAX_STATS; ++i)
+
+    for (uint8 i = 0; i < MAX_STATS; ++i)
         m_createStats[i] = 0.0f;
 
     m_attacking = NULL;
@@ -338,12 +339,12 @@ Unit::Unit()
     m_lastManaUse = 0;
 
     //m_victimThreat = 0.0f;
-    for (int i = 0; i < MAX_SPELL_SCHOOL; ++i)
+    for (uint8 i = 0; i < MAX_SPELL_SCHOOL; ++i)
         m_threatModifier[i] = 1.0f;
 
     m_isSorted = true;
 
-    for (int i = 0; i < MAX_MOVE_TYPE; ++i)
+    for (uint8 i = 0; i < MAX_MOVE_TYPE; ++i)
     {
         m_speed_rate[i] = 1.0f;
         m_max_speed_rate[i] = 1.0f;
@@ -355,7 +356,7 @@ Unit::Unit()
     m_misdirectionTargetGUID = 0;
 
     // remove aurastates allowing special moves
-    for (int i=0; i < MAX_REACTIVE; ++i)
+    for (uint8 i = 0; i < MAX_REACTIVE; ++i)
         m_reactiveTimer[i] = 0;
 
     m_meleeAPAttackerBonus = 0;
@@ -760,13 +761,7 @@ void Unit::RemoveSpellbyDamageTaken(uint32 damage, uint32 spell)
         if (*i && (!spell || (*i)->GetId() != spell))
         {
             if(GetDiminishingReturnsGroupForSpell((*i)->GetSpellProto(), false) == DIMINISHING_ENSLAVE)
-                if(Unit *caster = (*i)->GetCaster())
-                {
-                    if(caster->MagicSpellHitResult(this, (*i)->GetSpellProto()) == SPELL_MISS_RESIST)
-                        aurasToRemove.push_back(auraPair);
-                    else
-                        continue;
-                }
+                continue;
 
             roll = roll_chance_f(chance);
             if (roll)
@@ -1715,7 +1710,7 @@ void Unit::DealMeleeDamage(MeleeDamageLog *damageInfo, bool durabilityLoss)
         }
     }
 
-    if (GetTypeId() == TYPEID_PLAYER && !((Player *)this)->IsInFeralForm(true))
+    if (GetTypeId() == TYPEID_PLAYER && !IsInFeralForm(true))
         ((Player *)this)->CastItemCombatSpell(pVictim, damageInfo->attackType, damageInfo->procVictim, damageInfo->procEx);
 
     // Do effect if any damage done to target
@@ -3111,7 +3106,7 @@ uint32 Unit::GetWeaponSkillValue (WeaponAttackType attType, Unit const* target) 
             return 0;
         }
 
-        if (((Player*)this)->IsInFeralForm(true))
+        if (IsInFeralForm(true))
             return GetMaxSkillValueForLevel();              // always maximized SKILL_FERAL_COMBAT in fact
 
         // weapon skill or (unarmed for base attack)
@@ -3186,7 +3181,7 @@ void Unit::_UpdateSpells(uint32 time)
 
     if (!m_gameObj.empty())
     {
-        std::list<GameObject*>::iterator itr;
+        GameObjectList::iterator itr;
         for (itr = m_gameObj.begin(); itr != m_gameObj.end();)
         {
             if (!(*itr)->isSpawned())
@@ -3224,7 +3219,7 @@ void Unit::_UpdateAutoRepeatSpell()
     if (isAttackReady(RANGED_ATTACK))
     {
         // Check if able to cast
-        if (m_currentSpells[CURRENT_AUTOREPEAT_SPELL]->CanCast(true))
+        if (m_currentSpells[CURRENT_AUTOREPEAT_SPELL]->CheckCast(true) != SPELL_CAST_OK)
         {
             InterruptSpell(CURRENT_AUTOREPEAT_SPELL);
             return;
@@ -3246,7 +3241,7 @@ void Unit::SetCurrentCastedSpell(Spell * pSpell)
 {
     assert(pSpell);                                         // NULL may be never passed here, use InterruptSpell or InterruptNonMeleeSpells
 
-    uint32 CSpellType = pSpell->GetCurrentContainer();
+    CurrentSpellTypes CSpellType = pSpell->GetCurrentContainer();
 
     if (pSpell == m_currentSpells[CSpellType]) return;      // avoid breaking self
 
@@ -3336,8 +3331,12 @@ void Unit::InterruptSpell(uint32 spellType, bool withDelayed, bool withInstant)
         if (spell->getState() != SPELL_STATE_FINISHED)
             spell->cancel();
 
-        m_currentSpells[spellType] = NULL;
-        spell->SetReferencedFromCurrent(false);
+        // cancel can interrupt spell already (caster cancel ->target aura remove -> caster iterrupt)
+        if (m_currentSpells[spellType])
+        {
+            m_currentSpells[spellType]->SetReferencedFromCurrent(false);
+            m_currentSpells[spellType] = NULL;
+        }
     }
 }
 
@@ -3973,48 +3972,48 @@ bool Unit::RemoveNoStackAurasDueToAura(Aura *Aur)
             }
         }
 
-        if (!is_triggered_by_spell)
+        if (is_triggered_by_spell)
+            continue;
+
+        bool sameCaster = Aur->GetCasterGUID() == (*i).second->GetCasterGUID();
+        if (spellmgr.IsNoStackSpellDueToSpell(spellId, i_spellId, sameCaster))
         {
-            bool sameCaster = Aur->GetCasterGUID() == (*i).second->GetCasterGUID();
-            if (spellmgr.IsNoStackSpellDueToSpell(spellId, i_spellId, sameCaster))
+            //some spells should be not removed by lower rank of them (totem, paladin aura)
+/*            if (!sameCaster
+                &&(spellProto->Effect[effIndex]==SPELL_EFFECT_APPLY_AREA_AURA_PARTY)
+                &&(spellProto->DurationIndex==21)
+                &&(spellmgr.IsRankSpellDueToSpell(spellProto, i_spellId))
+                &&(CompareAuraRanks(spellId, effIndex, i_spellId, i_effIndex) < 0))
+                return false;*/     // is this needed ? Oo
+
+            // Its a parent aura (create this aura in ApplyModifier)
+            if ((*i).second->IsInUse())
             {
-                //some spells should be not removed by lower rank of them (totem, paladin aura)
-                if (!sameCaster
-                    &&(spellProto->Effect[effIndex]==SPELL_EFFECT_APPLY_AREA_AURA_PARTY)
-                    &&(spellProto->DurationIndex==21)
-                    &&(spellmgr.IsRankSpellDueToSpell(spellProto, i_spellId))
-                    &&(CompareAuraRanks(spellId, effIndex, i_spellId, i_effIndex) < 0))
-                    return false;
-
-                // Its a parent aura (create this aura in ApplyModifier)
-                if ((*i).second->IsInUse())
-                {
-                    sLog.outError("Aura (Spell %u Effect %u) is in process but attempt removed at aura (Spell %u Effect %u) adding, need add stack rule for Unit::RemoveNoStackAurasDueToAura", i->second->GetId(), i->second->GetEffIndex(),Aur->GetId(), Aur->GetEffIndex());
-                    continue;
-                }
-
-                uint64 caster = (*i).second->GetCasterGUID();
-                // Remove all auras by aura caster
-                for (uint8 a=0;a<3;++a)
-                {
-                    spellEffectPair spair = spellEffectPair(i_spellId, a);
-                    for (AuraMap::iterator iter = m_Auras.lower_bound(spair); iter != m_Auras.upper_bound(spair);)
-                    {
-                        if (iter->second->GetCasterGUID()==caster)
-                        {
-                            RemoveAura(iter, AURA_REMOVE_BY_STACK);
-                            iter = m_Auras.lower_bound(spair);
-                        }
-                        else
-                            ++iter;
-                    }
-                }
-
-                if (m_Auras.empty())
-                    break;
-                else
-                    next =  m_Auras.begin();
+                sLog.outError("Aura (Spell %u Effect %u) is in process but attempt removed at aura (Spell %u Effect %u) adding, need add stack rule for Unit::RemoveNoStackAurasDueToAura", i->second->GetId(), i->second->GetEffIndex(),Aur->GetId(), Aur->GetEffIndex());
+                continue;
             }
+
+            uint64 caster = (*i).second->GetCasterGUID();
+            // Remove all auras by aura caster
+            for (uint8 a=0;a<3;++a)
+            {
+                spellEffectPair spair = spellEffectPair(i_spellId, a);
+                for (AuraMap::iterator iter = m_Auras.lower_bound(spair); iter != m_Auras.upper_bound(spair);)
+                {
+                    if (iter->second->GetCasterGUID()==caster)
+                    {
+                        RemoveAura(iter, AURA_REMOVE_BY_STACK);
+                        iter = m_Auras.lower_bound(spair);
+                    }
+                    else
+                        ++iter;
+                }
+            }
+
+            if (m_Auras.empty())
+                break;
+            else
+                next =  m_Auras.begin();
         }
     }
     return true;
@@ -4638,6 +4637,15 @@ DynamicObject * Unit::GetDynObject(uint32 spellId)
     return NULL;
 }
 
+GameObject* Unit::GetGameObject(uint32 spellId) const
+{
+    for (GameObjectList::const_iterator i = m_gameObj.begin(); i != m_gameObj.end();)
+        if ((*i)->GetSpellId() == spellId)
+            return *i;
+
+    return NULL;
+}
+
 void Unit::AddGameObject(GameObject* gameObj)
 {
     assert(gameObj && gameObj->GetOwnerGUID()==0);
@@ -4678,7 +4686,7 @@ void Unit::RemoveGameObject(uint32 spellid, bool del)
 {
     if (m_gameObj.empty())
         return;
-    std::list<GameObject*>::iterator i, next;
+    GameObjectList::iterator i, next;
     for (i = m_gameObj.begin(); i != m_gameObj.end(); i = next)
     {
         next = i;
@@ -4701,7 +4709,7 @@ void Unit::RemoveGameObject(uint32 spellid, bool del)
 void Unit::RemoveAllGameObjects()
 {
     // remove references to unit
-    for (std::list<GameObject*>::iterator i = m_gameObj.begin(); i != m_gameObj.end();)
+    for (GameObjectList::iterator i = m_gameObj.begin(); i != m_gameObj.end();)
     {
         (*i)->SetOwnerGUID(0);
         (*i)->SetRespawnTime(0);
@@ -5144,14 +5152,14 @@ bool Unit::HandleDummyAuraProc(Unit *pVictim, uint32 damage, Aura* triggeredByAu
                         return false;
 
                     // Get Aldor reputation rank
-                    if (((Player *)this)->GetReputationRank(932) == REP_EXALTED)
+                    if (((Player *)this)->GetReputationMgr().GetRank(932) == REP_EXALTED)
                     {
                         target = this;
                         triggered_spell_id = ???
                         break;
                     }
                     // Get Scryers reputation rank
-                    if (((Player *)this)->GetReputationRank(934) == REP_EXALTED)
+                    if (((Player *)this)->GetReputationMgr().GetRank(934) == REP_EXALTED)
                     {
                         triggered_spell_id = ???
                         break;
@@ -5167,14 +5175,14 @@ bool Unit::HandleDummyAuraProc(Unit *pVictim, uint32 damage, Aura* triggeredByAu
                         return false;
 
                     // Get Aldor reputation rank
-                    if (((Player *)this)->GetReputationRank(932) == REP_EXALTED)
+                    if (((Player *)this)->GetReputationMgr().GetRank(932) == REP_EXALTED)
                     {
                         target = this;
                         triggered_spell_id = 45479;
                         break;
                     }
                     // Get Scryers reputation rank
-                    if (((Player *)this)->GetReputationRank(934) == REP_EXALTED)
+                    if (((Player *)this)->GetReputationMgr().GetRank(934) == REP_EXALTED)
                     {
                         if (this->IsFriendlyTo(target))
                             return false;
@@ -5193,14 +5201,14 @@ bool Unit::HandleDummyAuraProc(Unit *pVictim, uint32 damage, Aura* triggeredByAu
                         return false;
 
                     // Get Aldor reputation rank
-                    if (((Player *)this)->GetReputationRank(932) == REP_EXALTED)
+                    if (((Player *)this)->GetReputationMgr().GetRank(932) == REP_EXALTED)
                     {
                         target = this;
                         triggered_spell_id = 45480;
                         break;
                     }
                     // Get Scryers reputation rank
-                    if (((Player *)this)->GetReputationRank(934) == REP_EXALTED)
+                    if (((Player *)this)->GetReputationMgr().GetRank(934) == REP_EXALTED)
                     {
                         triggered_spell_id = 45428;
                         break;
@@ -5216,14 +5224,14 @@ bool Unit::HandleDummyAuraProc(Unit *pVictim, uint32 damage, Aura* triggeredByAu
                         return false;
 
                     // Get Aldor reputation rank
-                    if (((Player *)this)->GetReputationRank(932) == REP_EXALTED)
+                    if (((Player *)this)->GetReputationMgr().GetRank(932) == REP_EXALTED)
                     {
                         target = this;
                         triggered_spell_id = 45432;
                         break;
                     }
                     // Get Scryers reputation rank
-                    if (((Player *)this)->GetReputationRank(934) == REP_EXALTED)
+                    if (((Player *)this)->GetReputationMgr().GetRank(934) == REP_EXALTED)
                     {
                         target = this;
                         triggered_spell_id = 45431;
@@ -5240,14 +5248,14 @@ bool Unit::HandleDummyAuraProc(Unit *pVictim, uint32 damage, Aura* triggeredByAu
                         return false;
 
                     // Get Aldor reputation rank
-                    if (((Player *)this)->GetReputationRank(932) == REP_EXALTED)
+                    if (((Player *)this)->GetReputationMgr().GetRank(932) == REP_EXALTED)
                     {
                         target = this;
                         triggered_spell_id = 45478;
                         break;
                     }
                     // Get Scryers reputation rank
-                    if (((Player *)this)->GetReputationRank(934) == REP_EXALTED)
+                    if (((Player *)this)->GetReputationMgr().GetRank(934) == REP_EXALTED)
                     {
                         triggered_spell_id = 45430;
                         break;
@@ -5946,7 +5954,7 @@ bool Unit::HandleDummyAuraProc(Unit *pVictim, uint32 damage, Aura* triggeredByAu
                 // Windfury Weapon (Passive) 1-5 Ranks
                 case 33757:
                 {
-                    if (GetTypeId() != TYPEID_PLAYER || ((Player*)this)->IsInFeralForm(true))
+                    if (GetTypeId() != TYPEID_PLAYER || IsInFeralForm(true))
                         return false;
 
                     if (!castItem || !castItem->IsEquipped())
@@ -7143,29 +7151,31 @@ bool Unit::IsHostileTo(Unit const* unit) const
     // PvC forced reaction and reputation case
     if (tester->GetTypeId()==TYPEID_PLAYER)
     {
-        // forced reaction
-        ForcedReactions::const_iterator forceItr = ((Player*)tester)->m_forcedReactions.find(target_faction->faction);
-        if (forceItr!=((Player*)tester)->m_forcedReactions.end())
-            return forceItr->second <= REP_HOSTILE;
+        if(target_faction->faction)
+        {
+            if(ReputationRank const* force =((Player*)tester)->GetReputationMgr().GetForcedRankIfAny(target_faction))
+                return *force <= REP_HOSTILE;
 
-        // if faction have reputation then hostile state for tester at 100% dependent from at_war state
-        if (FactionEntry const* raw_target_faction = sFactionStore.LookupEntry(target_faction->faction))
-            if (raw_target_faction->reputationListID >=0)
-                if (FactionState const* factionState = ((Player*)tester)->GetFactionState(raw_target_faction))
+            // if faction have reputation then hostile state for tester at 100% dependent from at_war state
+            if(FactionEntry const* raw_target_faction = sFactionStore.LookupEntry(target_faction->faction))
+                if(FactionState const* factionState = ((Player*)tester)->GetReputationMgr().GetState(raw_target_faction))
                     return (factionState->Flags & FACTION_FLAG_AT_WAR);
+        }
     }
     // CvP forced reaction and reputation case
     else if (target->GetTypeId()==TYPEID_PLAYER)
     {
-        // forced reaction
-        ForcedReactions::const_iterator forceItr = ((Player const*)target)->m_forcedReactions.find(tester_faction->faction);
-        if (forceItr!=((Player const*)target)->m_forcedReactions.end())
-            return forceItr->second <= REP_HOSTILE;
+        if(target_faction->faction)
+        {
+            // forced reaction
+            if(ReputationRank const* force = ((Player*)target)->GetReputationMgr().GetForcedRankIfAny(tester_faction))
+                return *force <= REP_HOSTILE;
 
-        // apply reputation state
-        FactionEntry const* raw_tester_faction = sFactionStore.LookupEntry(tester_faction->faction);
-        if (raw_tester_faction && raw_tester_faction->reputationListID >=0)
-            return ((Player const*)target)->GetReputationRank(raw_tester_faction) <= REP_HOSTILE;
+            // apply reputation state
+            FactionEntry const* raw_tester_faction = sFactionStore.LookupEntry(tester_faction->faction);
+            if (raw_tester_faction && raw_tester_faction->reputationListID >=0)
+                return ((Player const*)target)->GetReputationMgr().GetRank(raw_tester_faction) <= REP_HOSTILE;
+        }
     }
 
     // common faction based case (CvC,PvC,CvP)
@@ -7252,29 +7262,32 @@ bool Unit::IsFriendlyTo(Unit const* unit) const
     // PvC forced reaction and reputation case
     if (tester->GetTypeId()==TYPEID_PLAYER)
     {
-        // forced reaction
-        ForcedReactions::const_iterator forceItr = ((Player const*)tester)->m_forcedReactions.find(target_faction->faction);
-        if (forceItr!=((Player const*)tester)->m_forcedReactions.end())
-            return forceItr->second >= REP_FRIENDLY;
+        if (tester_faction->faction)
+        {
+            // forced reaction
+            if(ReputationRank const* force =((Player*)tester)->GetReputationMgr().GetForcedRankIfAny(target_faction))
+                return *force >= REP_FRIENDLY;
 
-        // if faction have reputation then friendly state for tester at 100% dependent from at_war state
-        if (FactionEntry const* raw_target_faction = sFactionStore.LookupEntry(target_faction->faction))
-            if (raw_target_faction->reputationListID >=0)
-                if (FactionState const* FactionState = ((Player*)tester)->GetFactionState(raw_target_faction))
+            // if faction have reputation then friendly state for tester at 100% dependent from at_war state
+            if (FactionEntry const* raw_target_faction = sFactionStore.LookupEntry(target_faction->faction))
+                if (FactionState const* FactionState = ((Player*)tester)->GetReputationMgr().GetState(raw_target_faction))
                     return !(FactionState->Flags & FACTION_FLAG_AT_WAR);
+        }
     }
     // CvP forced reaction and reputation case
     else if (target->GetTypeId()==TYPEID_PLAYER)
     {
-        // forced reaction
-        ForcedReactions::const_iterator forceItr = ((Player const*)target)->m_forcedReactions.find(tester_faction->faction);
-        if (forceItr!=((Player const*)target)->m_forcedReactions.end())
-            return forceItr->second >= REP_FRIENDLY;
+        if (tester_faction->faction)
+        {
+            // forced reaction
+            if(ReputationRank const* force =((Player*)target)->GetReputationMgr().GetForcedRankIfAny(tester_faction))
+                return *force >= REP_FRIENDLY;
 
-        // apply reputation state
-        if (FactionEntry const* raw_tester_faction = sFactionStore.LookupEntry(tester_faction->faction))
-            if (raw_tester_faction->reputationListID >=0)
-                return ((Player const*)target)->GetReputationRank(raw_tester_faction) >= REP_FRIENDLY;
+            // apply reputation state
+            if (FactionEntry const* raw_tester_faction = sFactionStore.LookupEntry(tester_faction->faction))
+                if (raw_tester_faction->reputationListID >=0)
+                    return ((Player const*)target)->GetReputationMgr().GetRank(raw_tester_faction) >= REP_FRIENDLY;
+        }
     }
 
     // common faction based case (CvC,PvC,CvP)
@@ -7284,7 +7297,7 @@ bool Unit::IsFriendlyTo(Unit const* unit) const
 bool Unit::IsHostileToPlayers() const
 {
     FactionTemplateEntry const* my_faction = getFactionTemplateEntry();
-    if (!my_faction)
+    if (!my_faction || !my_faction->faction)
         return false;
 
     FactionEntry const* raw_faction = sFactionStore.LookupEntry(my_faction->faction);
@@ -7297,7 +7310,7 @@ bool Unit::IsHostileToPlayers() const
 bool Unit::IsNeutralToAll() const
 {
     FactionTemplateEntry const* my_faction = getFactionTemplateEntry();
-    if (!my_faction)
+    if (!my_faction || !my_faction->faction)
         return true;
 
     FactionEntry const* raw_faction = sFactionStore.LookupEntry(my_faction->faction);
@@ -7597,6 +7610,16 @@ Unit* Unit::GetCharm() const
     }
 
     return NULL;
+}
+
+float Unit::GetCombatDistance(const Unit* target) const
+{
+    float radius = target->GetFloatValue(UNIT_FIELD_COMBATREACH) + GetFloatValue(UNIT_FIELD_COMBATREACH);
+    float dx = GetPositionX() - target->GetPositionX();
+    float dy = GetPositionY() - target->GetPositionY();
+    float dz = GetPositionZ() - target->GetPositionZ();
+    float dist = sqrt((dx*dx) + (dy*dy) + (dz*dz)) - radius;
+    return ( dist > 0 ? dist : 0);
 }
 
 void Unit::SetPet(Pet* pet)
@@ -8980,27 +9003,7 @@ void Unit::Mount(uint32 mount)
 
     // unsummon pet
     if (GetTypeId() == TYPEID_PLAYER)
-    {
-        Pet* pet = GetPet();
-        if (pet)
-        {
-            BattleGround *bg = ((Player *)this)->GetBattleGround();
-            // don't unsummon pet in arena but SetFlag UNIT_FLAG_DISABLE_ROTATE to disable pet's interface
-            if (bg && bg->isArena())
-                pet->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_DISABLE_ROTATE);
-            else
-            {
-                if (pet->isControlled())
-                {
-                    ((Player*)this)->SetTemporaryUnsummonedPetNumber(pet->GetCharmInfo()->GetPetNumber());
-                    ((Player*)this)->SetOldPetSpell(pet->GetUInt32Value(UNIT_CREATED_BY_SPELL));
-                }
-                ((Player*)this)->RemovePet(NULL, PET_SAVE_NOT_IN_SLOT);
-                return;
-            }
-        }
-        ((Player*)this)->SetTemporaryUnsummonedPetNumber(0);
-    }
+        ((Player*)this)->UnsummonPetTemporaryIfAny();
 }
 
 void Unit::Unmount()
@@ -9019,20 +9022,8 @@ void Unit::Unmount()
     // only resummon old pet if the player is already added to a map
     // this prevents adding a pet to a not created map which would otherwise cause a crash
     // (it could probably happen when logging in after a previous crash)
-    if (GetTypeId() == TYPEID_PLAYER && IsInWorld() && isAlive())
-    {
-        if (((Player*)this)->GetTemporaryUnsummonedPetNumber())
-        {
-            Pet* NewPet = new Pet;
-            if (!NewPet->LoadPetFromDB(this, 0, ((Player*)this)->GetTemporaryUnsummonedPetNumber(), true))
-                delete NewPet;
-            ((Player*)this)->SetTemporaryUnsummonedPetNumber(0);
-        }
-        else
-           if (Pet *pPet = GetPet())
-               if (pPet->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_DISABLE_ROTATE) && !pPet->hasUnitState(UNIT_STAT_STUNNED))
-                   pPet->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_DISABLE_ROTATE);
-    }
+    if (GetTypeId() == TYPEID_PLAYER)
+        ((Player*)this)->ResummonPetTemporaryUnSummonedIfAny();
 }
 
 void Unit::SetInCombatWith(Unit* enemy)
@@ -10133,6 +10124,11 @@ Creature* Unit::GetCreature(uint64 guid)
     return GetMap()->GetCreature(guid);
 }
 
+Player* Unit::GetPlayerByName(const char *name)
+{
+    return sObjectMgr.GetPlayer(name);
+}
+
 bool Unit::isVisibleForInState(Player const* u, bool inVisibleList) const
 {
     return isVisibleForOrDetect(u, false, inVisibleList, false);
@@ -10142,7 +10138,7 @@ uint32 Unit::GetCreatureType() const
 {
     if (GetTypeId() == TYPEID_PLAYER)
     {
-        SpellShapeshiftEntry const* ssEntry = sSpellShapeshiftStore.LookupEntry(((Player*)this)->m_form);
+        SpellShapeshiftEntry const* ssEntry = sSpellShapeshiftStore.LookupEntry(m_form);
         if (ssEntry && ssEntry->creatureType > 0)
             return ssEntry->creatureType;
         else
@@ -11265,8 +11261,11 @@ Player* Unit::GetSpellModOwner() const
 }
 
 ///----------Pet responses methods-----------------
-void Unit::SendPetCastFail(uint32 spellid, uint8 msg)
+void Unit::SendPetCastFail(uint32 spellid, SpellCastResult msg)
 {
+    if(msg == SPELL_CAST_OK)
+        return;
+
     Unit *owner = GetCharmerOrOwner();
     if (!owner || owner->GetTypeId() != TYPEID_PLAYER)
         return;

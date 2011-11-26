@@ -1443,10 +1443,7 @@ bool GOUse_go_movie_orb(Player *player, GameObject* _GO)
     uint32 ScryingOrbCinematicId = 164;
     if (player)
     {
-        WorldPacket data(SMSG_TRIGGER_CINEMATIC, 4);
-        data << ScryingOrbCinematicId;
-        player->GetSession()->SendPacket(&data);
-        player->setWatchingCinematic(ScryingOrbCinematicId);
+        player->SendCinematicStart(ScryingOrbCinematicId);
 
         if (player->GetQuestStatus(11490) == QUEST_STATUS_INCOMPLETE)
             player->KilledMonster(25042, 0);
@@ -1454,7 +1451,7 @@ bool GOUse_go_movie_orb(Player *player, GameObject* _GO)
     return true;
 }
 
-bool CompletedCinematic_scrying_orb_cinematic(Player* player, CinematicSequenceEntry const* cinematic)
+bool CompletedCinematic_scrying_orb_cinematic(Player* player, CinematicSequencesEntry const* cinematic)
 {
     if (player)
     {

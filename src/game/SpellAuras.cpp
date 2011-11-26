@@ -325,7 +325,7 @@ m_procCharges(0), m_stackAmount(1), m_isRemoved(false), m_spellmod(NULL), m_effI
 m_timeCla(1000), m_castItemGuid(castItem?castItem->GetGUID():0), m_auraSlot(MAX_AURAS),
 m_positive(false), m_permanent(false), m_isPeriodic(false), m_isAreaAura(false),
 m_isPersistent(false), m_removeMode(AURA_REMOVE_BY_DEFAULT), m_isRemovedOnShapeLost(true), m_in_use(false),
-m_periodicTimer(0), m_amplitude(0), m_PeriodicEventId(0), m_AuraDRGroup(DIMINISHING_NONE)
+m_periodicTimer(0), m_amplitude(0), m_PeriodicEventId(0), m_AuraDRGroup(DIMINISHING_NONE), m_heartbeatTimer(0)
 ,m_tickNumber(0)
 {
     assert(target);
@@ -396,6 +396,8 @@ m_periodicTimer(0), m_amplitude(0), m_PeriodicEventId(0), m_AuraDRGroup(DIMINISH
 
     if (m_maxduration == -1 || m_isPassive && m_spellProto->DurationIndex == 0)
         m_permanent = true;
+    if (!m_permanent && m_maxduration > 12000 && m_spellProto->Attributes & SPELL_ATTR_BREAKABLE_BY_DAMAGE && GetEffIndex() == 0)
+        m_heartbeatTimer = m_maxduration / 8;
 
     Player* modOwner = caster ? caster->GetSpellModOwner() : NULL;
 
@@ -598,6 +600,18 @@ void Aura::Update(uint32 diff)
             }
         }
     }
+
+
+    if (m_heartbeatTimer && m_heartbeatTimer > m_duration)
+    {
+        m_heartbeatTimer *= 2;
+        if (Unit *caster = GetCaster())
+        {
+            if(caster->SpellHitResult(m_target, m_spellProto) != SPELL_MISS_NONE)
+                m_target->RemoveAurasByCasterSpell(m_spellProto->Id, caster->GetGUID());
+        }
+    }
+
 
     if (m_isPeriodic && (m_duration >= 0 || m_isPassive || m_permanent))
     {
@@ -2491,8 +2505,7 @@ void Aura::HandleAuraDummy(bool apply, bool Real)
                     m_target->CastSpell(m_target, 6947, true);
                 return;
             case 43873:                                     // Headless Horseman Laugh
-                if (caster->GetTypeId() == TYPEID_PLAYER)
-                    ((Player*)caster)->SendPlaySound(11965, false);
+                m_target->PlayDistanceSound(11965);
                 return;
             case 46699:                                     // Requires No Ammo
                 if (m_target->GetTypeId()==TYPEID_PLAYER)
@@ -2500,7 +2513,7 @@ void Aura::HandleAuraDummy(bool apply, bool Real)
                 return;
             case 44867:     // Spectral Exhaustion
                 if(m_target->GetTypeId() == TYPEID_PLAYER)
-                    ((Player*)m_target)->m_forcedReactions[960] = REP_FRIENDLY;
+                    ((Player*)m_target)->GetReputationMgr().ApplyForceReaction(960, REP_FRIENDLY, true);
                 return;
             case 43052:
             {
@@ -2695,11 +2708,11 @@ void Aura::HandleAuraDummy(bool apply, bool Real)
                 return;
             }
             case 39042:                                     // Rampant Infection
-            case 39032:                                     // Initial Infection    
+            case 39032:                                     // Initial Infection
                 if (m_removeMode == AURA_REMOVE_BY_EXPIRE)
                 {
                     int32 bp = GetModifierValue() * 11 / 10;
-                    m_target->CastCustomSpell(m_target, 39042, &bp, &bp, 0, true, 0, this);           
+                    m_target->CastCustomSpell(m_target, 39042, &bp, &bp, 0, true, 0, this);
                 }
                 return;
         }
@@ -2726,7 +2739,7 @@ void Aura::HandleAuraDummy(bool apply, bool Real)
             if (GetId() == 24658)
             {
                 uint32 spellId = 24659;
-                if (apply)
+                if (apply && caster)
                 {
                     const SpellEntry *spell = sSpellStore.LookupEntry(spellId);
                     if (!spell)
@@ -2742,7 +2755,7 @@ void Aura::HandleAuraDummy(bool apply, bool Real)
             if (GetId() == 24661)
             {
                 uint32 spellId = 24662;
-                if (apply)
+                if (apply && caster)
                 {
                     const SpellEntry *spell = sSpellStore.LookupEntry(spellId);
                     if (!spell)
@@ -3550,8 +3563,11 @@ void Aura::HandleAuraTransform(bool apply, bool Real)
                 if (GetId()==42016 && m_target->GetMountID() && !m_target->GetAurasByType(SPELL_AURA_MOD_INCREASE_FLIGHT_SPEED).empty())
                     m_target->SetUInt32Value(UNIT_FIELD_MOUNTDISPLAYID,16314);
             }
-            m_target->setTransForm(GetId());
         }
+
+        // update active transform spell only not set or not overwriting negative by positive case
+        if (!m_target->getTransForm() || !IsPositiveSpell(GetId()) || IsPositiveSpell(m_target->getTransForm()))
+            m_target->setTransForm(GetId());
 
         // polymorph case
         if (Real && m_target->GetTypeId() == TYPEID_PLAYER && m_target->IsPolymorphed())
@@ -3568,13 +3584,13 @@ void Aura::HandleAuraTransform(bool apply, bool Real)
     }
     else
     {
+        // ApplyModifier(true) will reapply it if need
+        m_target->setTransForm(0);
+        m_target->SetDisplayId(m_target->GetNativeDisplayId());
+
+        // re-aplly some from still active with preference negative cases
         Unit::AuraList const& otherTransforms = m_target->GetAurasByType(SPELL_AURA_TRANSFORM);
-        if (otherTransforms.empty())
-        {
-            m_target->SetDisplayId(m_target->GetNativeDisplayId());
-            m_target->setTransForm(0);
-        }
-        else
+        if (!otherTransforms.empty())
         {
             m_target->setTransForm(0);
 
@@ -3629,20 +3645,8 @@ void Aura::HandleForceReaction(bool apply, bool Real)
     uint32 faction_id = m_modifier.m_miscvalue;
     uint32 faction_rank = m_modifier.m_amount;
 
-    if (apply)
-        player->m_forcedReactions[faction_id] = ReputationRank(faction_rank);
-    else
-        player->m_forcedReactions.erase(faction_id);
-
-    WorldPacket data;
-    data.Initialize(SMSG_SET_FORCED_REACTIONS, 4+player->m_forcedReactions.size()*(4+4));
-    data << uint32(player->m_forcedReactions.size());
-    for (ForcedReactions::const_iterator itr = player->m_forcedReactions.begin(); itr != player->m_forcedReactions.end(); ++itr)
-    {
-        data << uint32(itr->first);                         // faction_id (Faction.dbc)
-        data << uint32(itr->second);                        // reputation rank
-    }
-    player->SendDirectMessage(&data);
+    player->GetReputationMgr().ApplyForceReaction(faction_id,ReputationRank(faction_rank),apply);
+    player->GetReputationMgr().SendForceReactions();
 }
 
 void Aura::HandleAuraModSkill(bool apply, bool Real)
@@ -4004,7 +4008,7 @@ void Aura::HandleAuraModDisarm(bool apply, bool Real)
     if (m_target->GetTypeId() == TYPEID_PLAYER)
     {
         // main-hand attack speed already set to special value for feral form already and don't must change and reset at remove.
-        if (((Player *)m_target)->IsInFeralForm())
+        if (m_target->IsInFeralForm())
             return;
 
         if (apply)
@@ -4032,6 +4036,9 @@ void Aura::HandleAuraModStun(bool apply, bool Real)
 
 void Aura::HandleModStealth(bool apply, bool Real)
 {
+    uint32 spell_id = GetId();
+    Unit* pTarget = m_target;
+
     if (apply)
     {
         if (Real && m_target->GetTypeId()==TYPEID_PLAYER)
@@ -4049,67 +4056,70 @@ void Aura::HandleModStealth(bool apply, bool Real)
         // only at real aura add
         if (Real)
         {
-            m_target->SetByteValue(UNIT_FIELD_BYTES_1, 2, 0x02);
-            if (m_target->GetTypeId() == TYPEID_PLAYER)
-                m_target->SetFlag(PLAYER_FIELD_BYTES2, 0x2000);
+            pTarget->SetByteValue(UNIT_FIELD_BYTES_1, 2, 0x02);
+            if (pTarget->GetTypeId() == TYPEID_PLAYER)
+                pTarget->SetFlag(PLAYER_FIELD_BYTES2, 0x2000);
 
             // apply only if not in GM invisibility (and overwrite invisibility state)
-            if (m_target->GetVisibility() != VISIBILITY_OFF)
-                m_target->SetVisibility(VISIBILITY_GROUP_STEALTH);
+            if (pTarget->GetVisibility()!=VISIBILITY_OFF)
+                pTarget->SetVisibility(VISIBILITY_GROUP_STEALTH);
 
             // for RACE_NIGHTELF stealth
-            if (m_target->GetTypeId() == TYPEID_PLAYER && GetId() == 20580)
-                m_target->CastSpell(m_target, 21009, true, NULL, this);
+            if (pTarget->GetTypeId() == TYPEID_PLAYER && spell_id == 20580)
+                pTarget->CastSpell(pTarget, 21009, true, NULL, this);
+
+            // apply full stealth period bonuses only at first stealth aura in stack
+            if (pTarget->GetAurasByType(SPELL_AURA_MOD_STEALTH).size() <= 1)
+            {
+                Unit::AuraList const& mDummyAuras = pTarget->GetAurasByType(SPELL_AURA_DUMMY);
+                for (Unit::AuraList::const_iterator i = mDummyAuras.begin(); i != mDummyAuras.end(); ++i)
+                {
+                    // Master of Subtlety
+                    if ((*i)->GetSpellProto()->SpellIconID == 2114)
+                    {
+                        pTarget->RemoveAurasDueToSpell(31666);
+                        int32 bp = (*i)->GetModifier()->m_amount;
+                        pTarget->CastCustomSpell(pTarget, 31665, &bp, NULL, NULL, true);
+                        break;
+                    }
+                }
+            }
         }
     }
     else
     {
-        // only at real aura remove
-        if (Real)
-        {
-            // for RACE_NIGHTELF stealth
-            if (m_target->GetTypeId()==TYPEID_PLAYER && GetId()==20580)
-                m_target->RemoveAurasDueToSpell(21009);
+        // for RACE_NIGHTELF stealth
+        if (pTarget->GetTypeId() == TYPEID_PLAYER && spell_id == 20580)
+            pTarget->RemoveAurasDueToSpell(21009);
 
-            // if last SPELL_AURA_MOD_STEALTH and no GM invisibility
-            if (!m_target->HasAuraType(SPELL_AURA_MOD_STEALTH) && m_target->GetVisibility() != VISIBILITY_OFF)
+        // only at real aura remove of _last_ SPELL_AURA_MOD_STEALTH
+        if (Real && !pTarget->HasAuraType(SPELL_AURA_MOD_STEALTH))
+        {
+            // if no GM invisibility
+            if(pTarget->GetVisibility()!=VISIBILITY_OFF)
             {
-                m_target->SetByteValue(UNIT_FIELD_BYTES_1, 2, 0x00);
-                if (m_target->GetTypeId()==TYPEID_PLAYER)
-                    m_target->RemoveFlag(PLAYER_FIELD_BYTES2, 0x2000);
+                pTarget->SetByteValue(UNIT_FIELD_BYTES_1, 2, 0x00);
+                if (pTarget->GetTypeId() == TYPEID_PLAYER)
+                    pTarget->RemoveFlag(PLAYER_FIELD_BYTES2, 0x2000);
 
                 // restore invisibility if any
-                if (m_target->HasAuraType(SPELL_AURA_MOD_INVISIBILITY))
-                {
-                    m_target->SetVisibility(VISIBILITY_ON);
-                }
+                if (pTarget->HasAuraType(SPELL_AURA_MOD_INVISIBILITY))
+                    pTarget->SetVisibility(VISIBILITY_GROUP_STEALTH); // or maybe VISIBILITY_GROUP_STEALTH ?
                 else
+                    pTarget->SetVisibility(VISIBILITY_ON);
+            }
+
+            // apply delayed talent bonus remover at last stealth aura remove
+            Unit::AuraList const& mDummyAuras = pTarget->GetAurasByType(SPELL_AURA_DUMMY);
+            for (Unit::AuraList::const_iterator i = mDummyAuras.begin(); i != mDummyAuras.end(); ++i)
+            {
+                // Master of Subtlety
+                if ((*i)->GetSpellProto()->SpellIconID == 2114)
                 {
-                    m_target->SetVisibility(VISIBILITY_ON);
-                    /*
-                    if (m_target->GetTypeId() == TYPEID_PLAYER)
-                        if (OutdoorPvP * pvp = ((Player*)m_target)->GetOutdoorPvP())
-                            pvp->HandlePlayerActivityChanged((Player*)m_target);
-                    */
+                    pTarget->CastSpell(pTarget, 31666, true);
+                    break;
                 }
             }
-        }
-    }
-
-    // Master of Subtlety
-    Unit::AuraList const& mDummyAuras = m_target->GetAurasByType(SPELL_AURA_DUMMY);
-    for (Unit::AuraList::const_iterator i = mDummyAuras.begin();i != mDummyAuras.end(); ++i)
-    {
-        if ((*i)->GetSpellProto()->SpellIconID == 2114 && Real)
-        {
-            if (apply)
-            {
-                int32 bp = (*i)->GetModifier()->m_amount;
-                m_target->CastCustomSpell(m_target,31665,&bp,NULL,NULL,true);
-            }
-            else
-                m_target->CastSpell(m_target,31666,true);
-            break;
         }
     }
 }
@@ -4213,16 +4223,9 @@ void Aura::HandleAuraModSilence(bool apply, bool Real)
 
         // Stop cast only spells vs PreventionType == SPELL_PREVENTION_TYPE_SILENCE
         for (uint32 i = CURRENT_MELEE_SPELL; i < CURRENT_MAX_SPELL;i++)
-        {
-            Spell* currentSpell = m_target->m_currentSpells[i];
-            if (currentSpell && currentSpell->m_spellInfo->PreventionType == SPELL_PREVENTION_TYPE_SILENCE)
-            {
-                uint32 state = currentSpell->getState();
-                // Stop spells on prepare or casting state
-                if (state == SPELL_STATE_PREPARING || state == SPELL_STATE_CASTING)
-                    currentSpell->cancel();
-            }
-        }
+            if (m_target->m_currentSpells[i] && m_target->m_currentSpells[i]->m_spellInfo->PreventionType == SPELL_PREVENTION_TYPE_SILENCE)
+                m_target->InterruptSpell(i, false);         // Stop spells on prepare or casting state
+
 
         switch (GetId())
         {

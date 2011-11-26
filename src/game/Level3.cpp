@@ -2437,7 +2437,7 @@ bool ChatHandler::HandleListObjectCommand(const char* args)
     return true;
 }
 
-bool ChatHandler::HandleNearObjectCommand(const char* args)
+bool ChatHandler::HandleGameObjectNearCommand(const char* args)
 {
     float distance = (!*args) ? 10 : atol(args);
     uint32 count = 0;
@@ -2478,7 +2478,7 @@ bool ChatHandler::HandleNearObjectCommand(const char* args)
     return true;
 }
 
-bool ChatHandler::HandleObjectStateCommand(const char* args)
+bool ChatHandler::HandleGameObjectPhaseCommand(const char* args)
 {
     // number or [name] Shift-click form |color|Hgameobject:go_id|h[name]|h|r
     char* cId = extractKeyFromLink((char*)args, "Hgameobject");
@@ -3177,7 +3177,7 @@ bool ChatHandler::HandleGuildInviteCommand(const char *args)
         plGuid = objmgr.GetPlayerGUIDByName (plName.c_str ());
 
     if (!plGuid)
-        false;
+        return false;
 
     // player's guild membership checked in AddMember before add
     if (!targetGuild->AddMember (plGuid,targetGuild->GetLowestRank ()))
@@ -4076,7 +4076,7 @@ bool ChatHandler::HandleHideAreaCommand(const char* args)
     return true;
 }
 
-bool ChatHandler::HandleUpdate(const char* args)
+bool ChatHandler::HandleDebugUpdate(const char* args)
 {
     if (!*args)
         return false;
@@ -4176,7 +4176,7 @@ bool ChatHandler::HandleChangeWeather(const char* args)
     return true;
 }
 
-bool ChatHandler::HandleSetValue(const char* args)
+bool ChatHandler::HandleDebugSetValue(const char* args)
 {
     if (!*args)
         return false;
@@ -4227,7 +4227,7 @@ bool ChatHandler::HandleSetValue(const char* args)
     return true;
 }
 
-bool ChatHandler::HandleGetValue(const char* args)
+bool ChatHandler::HandleDebugGetValue(const char* args)
 {
     if (!*args)
         return false;
@@ -4300,7 +4300,7 @@ bool ChatHandler::HandleSet32Bit(const char* args)
     return true;
 }
 
-bool ChatHandler::HandleMod32Value(const char* args)
+bool ChatHandler::HandleDebugMod32Value(const char* args)
 {
     if (!*args)
         return false;
@@ -4332,7 +4332,7 @@ bool ChatHandler::HandleMod32Value(const char* args)
     return true;
 }
 
-bool ChatHandler::HandleAddTeleCommand(const char * args)
+bool ChatHandler::HandleTeleAddCommand(const char * args)
 {
     if (!*args)
         return false;
@@ -4372,7 +4372,7 @@ bool ChatHandler::HandleAddTeleCommand(const char * args)
     return true;
 }
 
-bool ChatHandler::HandleDelTeleCommand(const char * args)
+bool ChatHandler::HandleTeleDelCommand(const char * args)
 {
     if (!*args)
         return false;
@@ -4947,7 +4947,7 @@ bool ChatHandler::HandleServerIdleShutDownCommand(const char* args)
     return true;
 }
 
-bool ChatHandler::HandleAddQuest(const char* args)
+bool ChatHandler::HandleQuestAdd(const char* args)
 {
     Player* player = getSelectedPlayer();
     if (!player)
@@ -5001,7 +5001,7 @@ bool ChatHandler::HandleAddQuest(const char* args)
     return true;
 }
 
-bool ChatHandler::HandleRemoveQuest(const char* args)
+bool ChatHandler::HandleQuestRemove(const char* args)
 {
     Player* player = getSelectedPlayer();
     if (!player)
@@ -5051,7 +5051,7 @@ bool ChatHandler::HandleRemoveQuest(const char* args)
     return true;
 }
 
-bool ChatHandler::HandleCompleteQuest(const char* args)
+bool ChatHandler::HandleQuestComplete(const char* args)
 {
     Player* player = getSelectedPlayer();
     if (!player)
@@ -5125,12 +5125,10 @@ bool ChatHandler::HandleCompleteQuest(const char* args)
     if (uint32 repFaction = pQuest->GetRepObjectiveFaction())
     {
         uint32 repValue = pQuest->GetRepObjectiveValue();
-        uint32 curRep = player->GetReputation(repFaction);
+        uint32 curRep = player->GetReputationMgr().GetReputation(repFaction);
         if (curRep < repValue)
-        {
-            FactionEntry const *factionEntry = sFactionStore.LookupEntry(repFaction);
-            player->SetFactionReputation(factionEntry,repValue);
-        }
+            if (FactionEntry const *factionEntry = sFactionStore.LookupEntry(repFaction))
+                player->GetReputationMgr().SetReputation(factionEntry,repValue);
     }
 
     // If the quest requires money
@@ -5716,7 +5714,7 @@ bool ChatHandler::HandleRespawnCommand(const char* /*args*/)
     return true;
 }
 
-bool ChatHandler::HandleFlyModeCommand(const char* args)
+bool ChatHandler::HandleGMFlyModeCommand(const char* args)
 {
     if (!args)
         return false;
@@ -6691,8 +6689,6 @@ bool ChatHandler::HandleSendMoneyCommand(const char* args)
         return false;
     }
 
-    uint32 mailId = objmgr.GenerateMailID();
-
     // from console show not existed sender
     MailSender sender(MAIL_NORMAL,m_session ? m_session->GetPlayer()->GetGUIDLow() : 0, MAIL_STATIONERY_GM);
 
@@ -7130,7 +7126,7 @@ bool ChatHandler::HandleUnbindSightCommand(const char* args)
     return true;
 }
 
-bool ChatHandler::HandleNearGridObjectCommand(const char* args)
+bool ChatHandler::HandleGameObjectNearGridCommand(const char* args)
 {
     std::list<GameObject*> tmpL;
     Trinity::AllGameObjectsInRange go_check(m_session->GetPlayer(), 20.0f);

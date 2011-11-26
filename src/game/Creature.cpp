@@ -41,7 +41,7 @@
 #include "SpellAuras.h"
 #include "WaypointMovementGenerator.h"
 #include "InstanceData.h"
-#include "BattleGround.h"
+#include "BattleGroundMgr.h"
 #include "Util.h"
 #include "GridNotifiers.h"
 #include "GridNotifiersImpl.h"
@@ -55,19 +55,11 @@
 
 std::map<uint32, uint32> CreatureAIReInitialize;
 
-void TrainerSpellData::Clear()
-{
-    for (TrainerSpellList::iterator itr = spellList.begin(); itr != spellList.end(); ++itr)
-        delete (*itr);
-
-    spellList.clear();
-}
-
 TrainerSpell const* TrainerSpellData::Find(uint32 spell_id) const
 {
-    for (TrainerSpellList::const_iterator itr = spellList.begin(); itr != spellList.end(); ++itr)
-        if ((*itr)->spell == spell_id)
-            return *itr;
+    TrainerSpellMap::const_iterator itr = spellList.find(spell_id);
+    if (itr != spellList.end())
+        return &itr->second;
 
     return NULL;
 }
@@ -155,12 +147,13 @@ Creature::Creature() :
 Unit(), m_aggroRange(0.0),
 lootForPickPocketed(false), lootForBody(false), m_lootMoney(0), m_lootRecipient(0),
 m_deathTimer(0), m_respawnTime(0), m_respawnDelay(300), m_corpseDelay(60), m_respawnradius(0.0f),
-m_gossipOptionLoaded(false), m_emoteState(0), m_isPet(false), m_isTotem(false), m_reactState(REACT_AGGRESSIVE),
-m_regenTimer(2000), m_defaultMovementType(IDLE_MOTION_TYPE), m_equipmentId(0), m_AlreadyCallAssistance(false),
+m_gossipOptionLoaded(false), m_isPet(false), m_isTotem(false), m_reactState(REACT_AGGRESSIVE),
+m_defaultMovementType(IDLE_MOTION_TYPE), m_equipmentId(0), m_AlreadyCallAssistance(false),
 m_regenHealth(true), m_isDeadByDefault(false), m_AlreadySearchedAssistance(false), m_creatureData(NULL),
 m_meleeDamageSchoolMask(SPELL_SCHOOL_MASK_NORMAL),m_creatureInfo(NULL), m_DBTableGuid(0), m_formation(NULL), m_PlayerDamageReq(0),
 m_tempSummon(false)
 {
+    m_regenTimer = 2000;
     m_valuesCount = UNIT_END;
 
     for (int i =0; i < CREATURE_MAX_SPELLS; ++i)
@@ -795,7 +788,7 @@ bool Creature::isCanInteractWithBattleMaster(Player* pPlayer, bool msg) const
     if (!isBattleMaster())
         return false;
 
-    uint32 bgTypeId = objmgr.GetBattleMasterBG(GetEntry());
+    BattleGroundTypeId bgTypeId = sBattleGroundMgr.GetBattleMasterBG(GetEntry());
     if (!msg)
         return pPlayer->GetBGAccessByLevel(bgTypeId);
 
@@ -848,7 +841,7 @@ void Creature::prepareGossipMenu(Player *pPlayer,uint32 gossipid)
             if (gso->Id==1)
             {
                 uint32 textid=GetNpcTextId();
-                GossipText * gossiptext=objmgr.GetGossipText(textid);
+                GossipText const * gossiptext=objmgr.GetGossipText(textid);
                 if (!gossiptext)
                     cantalking=false;
             }
@@ -1064,7 +1057,7 @@ void Creature::OnGossipSelect(Player* player, uint32 option)
             break;
         case GOSSIP_OPTION_BATTLEFIELD:
         {
-            uint32 bgTypeId = objmgr.GetBattleMasterBG(GetEntry());
+            BattleGroundTypeId bgTypeId = sBattleGroundMgr.GetBattleMasterBG(GetEntry());
             player->GetSession()->SendBattlegGroundList(GetGUID(), bgTypeId);
             break;
         }
@@ -1163,7 +1156,7 @@ void Creature::LoadGossipOptions()
     m_gossipOptionLoaded = true;
 }
 
-void Creature::AI_SendMoveToPacket(float x, float y, float z, uint32 time, uint32 MovementFlags, uint8 type)
+void Creature::AI_SendMoveToPacket(float x, float y, float z, uint32 time, uint32 MovementFlags, SplineType type)
 {
     /*    uint32 timeElap = WorldTimer::getMSTime();
         if ((timeElap - m_startMove) < m_moveTime)
@@ -1901,7 +1894,9 @@ SpellEntry const *Creature::reachWithSpellAttack(Unit *pVictim)
         SpellRangeEntry const* srange = sSpellRangeStore.LookupEntry(spellInfo->rangeIndex);
         float range = GetSpellMaxRange(srange);
         float minrange = GetSpellMinRange(srange);
-        float dist = GetDistance(pVictim);
+
+        float dist = GetCombatDistance(pVictim);
+
         //if(!isInFront(pVictim, range) && spellInfo->AttributesEx)
         //    continue;
         if (dist > range || dist < minrange)
@@ -1945,7 +1940,9 @@ SpellEntry const *Creature::reachWithSpellCure(Unit *pVictim)
         SpellRangeEntry const* srange = sSpellRangeStore.LookupEntry(spellInfo->rangeIndex);
         float range = GetSpellMaxRange(srange);
         float minrange = GetSpellMinRange(srange);
-        float dist = GetDistance(pVictim);
+
+        float dist = GetCombatDistance(pVictim);
+
         //if(!isInFront(pVictim, range) && spellInfo->AttributesEx)
         //    continue;
         if (dist > range || dist < minrange)

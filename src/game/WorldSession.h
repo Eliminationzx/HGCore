@@ -212,7 +212,7 @@ class TRINITY_DLL_SPEC WorldSession
 
         void SendAttackStop(Unit const* enemy);
 
-        void SendBattlegGroundList(uint64 guid, uint32 bgTypeId);
+        void SendBattlegGroundList(uint64 guid, BattleGroundTypeId bgTypeId);
 
         void SendTradeStatus(uint32 status);
         void SendCancelTrade();
@@ -459,7 +459,7 @@ class TRINITY_DLL_SPEC WorldSession
         void HandleGuildSaveEmblemOpcode(WorldPacket& recvPacket);
 
         void HandleTaxiNodeStatusQueryOpcode(WorldPacket& recvPacket);
-        void HandleTaxiQueryAvailableNodesOpcode(WorldPacket& recvPacket);
+        void HandleTaxiQueryAvailableNodes(WorldPacket& recvPacket);
         void HandleActivateTaxiOpcode(WorldPacket& recvPacket);
         void HandleActivateTaxiFarOpcode(WorldPacket& recvPacket);
         void HandleMoveSplineDoneOpcode(WorldPacket& recvPacket);
@@ -706,6 +706,8 @@ class TRINITY_DLL_SPEC WorldSession
     private:
         // private trade methods
         void moveItems(Item* myItems[], Item* hisItems[]);
+
+        void ExecuteOpcode(OpcodeHandler& opHandle, WorldPacket* packet);
 
         bool CheckMailBox(ObjectGuid& guid);
 

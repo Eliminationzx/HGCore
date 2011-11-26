@@ -710,7 +710,7 @@ void ScriptMgr::LoadCompletedCinematicScripts()
         uint32 Cinematic_ID    = fields[0].GetUInt32();
         const char *scriptName = fields[1].GetString();
 
-        CinematicSequenceEntry const* cinematic = sCinematicStore.LookupEntry(Cinematic_ID);
+        CinematicSequencesEntry const* cinematic = sCinematicSequencesStore.LookupEntry(Cinematic_ID);
         if (!cinematic)
         {
             sLog.outErrorDb("Cinematic sequence (ID:%u) does not exist in `CinematicSequeces.dbc`.",Cinematic_ID);
@@ -822,7 +822,7 @@ bool ScriptMgr::OnAreaTrigger(Player* pPlayer, AreaTriggerEntry const* atEntry)
     return m_pOnAreaTrigger != NULL && m_pOnAreaTrigger(pPlayer, atEntry);
 }
 
-bool ScriptMgr::OnCompletedCinematic(Player* pPlayer, CinematicSequenceEntry const* cinematic)
+bool ScriptMgr::OnCompletedCinematic(Player* pPlayer, CinematicSequencesEntry const* cinematic)
 {
     return m_pOnCompletedCinematic != NULL && m_pOnCompletedCinematic(pPlayer, cinematic);
 }

@@ -298,10 +298,10 @@ struct TRINITY_DLL_DECL ScriptedAI : public CreatureAI
     void AddSpellToCast(Unit* victim, uint32 spellId, bool triggered = false, bool visualTarget = false);
     void AddCustomSpellToCast(Unit* victim, uint32 spellId, int32 dmg0 = 0, int32 dmg1 = 0, int32 dmg2 = 0, bool triggered = false, bool visualTarget = false);
     void AddSpellToCast(float x, float y, float z, uint32 spellId, bool triggered = false, bool visualTarget = false);
-    void AddSpellToCast(uint32 spellId, castTargetMode targetMode, bool triggered = false);
+    void AddSpellToCast(uint32 spellId, castTargetMode targetMode = CAST_TANK, bool triggered = false);
     void AddCustomSpellToCast(uint32 spellId, castTargetMode targetMode, int32 dmg0 = 0, int32 dmg1 = 0, int32 dmg2 = 0, bool triggered = false);
     void AddSpellToCastWithScriptText(Unit* victim, uint32 spellId, int32 scriptTextEntry, bool triggered = false, bool visualTarget = false);
-    void AddSpellToCastWithScriptText(uint32 spellId, castTargetMode self, int32 scriptTextEntry, bool triggered = false);
+    void AddSpellToCastWithScriptText(uint32 spellId, castTargetMode targetMode, int32 scriptTextEntry, bool triggered = false);
 
     //Forces spell cast by Id
     void ForceSpellCast(Unit* victim, uint32 spellId, interruptSpell interruptCurrent = DONT_INTERRUPT, bool triggered = false, bool visualTarget = false);
