@@ -515,6 +515,9 @@ void Player::CleanupsBeforeDelete()
             }
             setGMFollow(0);
         }
+
+        // just to be sure that we are removed from all outdoorpvp before we are deleted
+        sOutdoorPvPMgr.HandlePlayerLeave(this);
     }
 
     ClearLFG();
@@ -1983,9 +1986,9 @@ void Player::RemoveFromWorld()
         UnsummonAllTotems();
         RemoveMiniPet();
         RemoveGuardians();
-
-        sOutdoorPvPMgr.HandlePlayerLeaveZone(this, m_zoneUpdateId);
     }
+
+    sOutdoorPvPMgr.HandlePlayerLeave(this);
 
     for (int i = PLAYER_SLOT_START; i < PLAYER_SLOT_END; i++)
     {
@@ -5740,7 +5743,7 @@ void Player::CheckAreaExploreAndOutdoor()
                 uint32 XP = 0;
                 if (diff < -5)
                 {
-                    XP = uint32(objmgr.GetBaseXP(getLevel()+5)*sWorld.getRate(RATE_XP_EXPLORE));
+                    XP = uint32(objmgr.GetBaseXP(getLevel()+5)*GetXPRate(RATE_XP_EXPLORE));
                 }
                 else if (diff > 5)
                 {
@@ -5750,11 +5753,11 @@ void Player::CheckAreaExploreAndOutdoor()
                     else if (exploration_percent < 0)
                         exploration_percent = 0;
 
-                    XP = uint32(objmgr.GetBaseXP(p->area_level)*exploration_percent/100*sWorld.getRate(RATE_XP_EXPLORE));
+                    XP = uint32(objmgr.GetBaseXP(p->area_level)*exploration_percent/100*GetXPRate(RATE_XP_EXPLORE));
                 }
                 else
                 {
-                    XP = uint32(objmgr.GetBaseXP(p->area_level)*sWorld.getRate(RATE_XP_EXPLORE));
+                    XP = uint32(objmgr.GetBaseXP(p->area_level)*GetXPRate(RATE_XP_EXPLORE));
                 }
 
                 GiveXP(XP, NULL);
@@ -12761,7 +12764,7 @@ void Player::RewardQuest(Quest const *pQuest, uint32 reward, Object* questGiver,
     QuestStatusData& q_status = mQuestStatus[quest_id];
 
     // Not give XP in case already completed once repeatable quest
-    uint32 XP = q_status.m_rewarded ? 0 : uint32(pQuest->XPValue(this)*sWorld.getRate(RATE_XP_QUEST));
+    uint32 XP = q_status.m_rewarded ? 0 : uint32(pQuest->XPValue(this)*GetXPRate(RATE_XP_QUEST));
 
     if (getLevel() < sWorld.getConfig(CONFIG_MAX_PLAYER_LEVEL))
         GiveXP(XP , NULL);
@@ -14937,7 +14940,7 @@ void Player::_LoadInventory(QueryResultAutoPtr result, uint32 timediff)
             {
                 sLog.outError("Player::_LoadInventory: Player %s has item (GUID: %u Entry: %u) can't be loaded to inventory (Bag GUID: %u Slot: %u) by some reason, will send by mail.", GetName(),item_guid, item_id, bag_guid, slot);
                 CharacterDatabase.PExecute("DELETE FROM character_inventory WHERE item = '%u'", item_guid);
-                if (!GetSession()->SpecialLog())
+                if (!GetSession()->IsAccountFlagged(ACC_SPECIAL_LOG))
                     problematicItems.push_back(item);
             }
         } while (result->NextRow());
@@ -15755,7 +15758,7 @@ void Player::SaveToDB()
     ss << uint32(m_atLoginFlags);
 
     ss << ", ";
-    ss << GetZoneId();
+    ss << GetCachedZone();
 
     ss << ", ";
     ss << (uint64)m_deathExpireTime;
@@ -15972,10 +15975,10 @@ void Player::_SaveInventory()
 
                 //zostawiam special log dla pewnosci, autobana sie przywroci jesli bedzie potrzeba
                 LoginDatabase.BeginTransaction();
-                if (!GetSession()->SpecialLog())
+                if (!GetSession()->IsAccountFlagged(ACC_SPECIAL_LOG))
                 {
-                    LoginDatabase.PExecute("UPDATE account SET speciallog = '1' WHERE id = '%u'", GetSession()->GetAccountId());
-                    GetSession()->SetSpecialLog(true);
+                    GetSession()->AddAccountFlag(ACC_SPECIAL_LOG);
+                    LoginDatabase.PExecute("UPDATE account SET accounts_flag = accounts_flag | '%u' WHERE id = '%u'", ACC_SPECIAL_LOG, GetSession()->GetAccountId());
                 }
 
                 LoginDatabase.PExecute("INSERT INTO account_banned VALUES(%i, UNIX_TIMESTAMP(), UNIX_TIMESTAMP(), 'Siof', 'With love: cheater -.-', 1)", GetSession()->GetAccountId());
@@ -15992,10 +15995,10 @@ void Player::_SaveInventory()
 
                 //zostawiam special log dla pewnosci, autobana sie przywroci jesli bedzie potrzeba
                 LoginDatabase.BeginTransaction();
-                if (!GetSession()->SpecialLog())
+                if (!GetSession()->IsAccountFlagged(ACC_SPECIAL_LOG))
                 {
-                    LoginDatabase.PExecute("UPDATE account SET speciallog = '1' WHERE id = '%u'", GetSession()->GetAccountId());
-                    GetSession()->SetSpecialLog(true);
+                    GetSession()->AddAccountFlag(ACC_SPECIAL_LOG);
+                    LoginDatabase.PExecute("UPDATE account SET account_flags = account_flags | '%u' WHERE id = '%u'", ACC_SPECIAL_LOG, GetSession()->GetAccountId());
                 }
 
                 LoginDatabase.PExecute("INSERT INTO account_banned VALUES(%i, UNIX_TIMESTAMP(), UNIX_TIMESTAMP(), 'Siof', 'With love: cheater -.-', 1)", GetSession()->GetAccountId());
@@ -16678,13 +16681,13 @@ void Player::Whisper(const std::string& text, uint32 language,uint64 receiver)
         WorldPacket data(SMSG_MESSAGECHAT, 200);
         BuildPlayerChat(&data, CHAT_MSG_WHISPER, text, language);
         rPlayer->GetSession()->SendPacket(&data);
-        if (rPlayer->GetSession()->WhispLog())
+        if (rPlayer->GetSession()->IsAccountFlagged(ACC_WHISPER_LOG))
             sLog.outWhisp(rPlayer->GetSession()->GetAccountId(), "[%s | %u] FROM: %u (%s) : %s ", rPlayer->GetName(), rPlayer->GetGUID(), GetGUID(), GetName(), text.c_str());
 
         data.Initialize(SMSG_MESSAGECHAT, 200);
         rPlayer->BuildPlayerChat(&data, CHAT_MSG_REPLY, text, language);
         GetSession()->SendPacket(&data);
-        if (GetSession()->WhispLog())
+        if (GetSession()->IsAccountFlagged(ACC_WHISPER_LOG))
             sLog.outWhisp(GetSession()->GetAccountId(), "[%s | %u] TO: %u (%s), %s", GetName(), GetGUID(), rPlayer->GetGUID(), rPlayer->GetName(), text.c_str());
     }
     else
@@ -18953,7 +18956,7 @@ void Player::AutoUnequipOffhandIfNeed()
 
 OutdoorPvP * Player::GetOutdoorPvP() const
 {
-    return sOutdoorPvPMgr.GetOutdoorPvPToZoneId(GetZoneId());
+    return sOutdoorPvPMgr.GetOutdoorPvPToZoneId(GetCachedZone());
 }
 
 bool Player::HasItemFitToSpellReqirements(SpellEntry const* spellInfo, Item const* ignoreItem)
@@ -20177,4 +20180,12 @@ void Player::SendTimeSync()
     // Schedule next sync in 10 sec
     m_timeSyncTimer = 10000;
     m_timeSyncServer = WorldTimer::getMSTime();
+}
+
+float Player::GetXPRate(Rates rate)
+{
+    if (sWorld.getConfig(CONFIG_ENABLE_CUSTOM_XP_RATES) && GetSession()->IsAccountFlagged(ACC_BLIZZLIKE_RATES))
+        return 1.0f;
+    else
+        return sWorld.getRate(Rates(rate));
 }

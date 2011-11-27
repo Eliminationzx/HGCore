@@ -383,9 +383,9 @@ void Object::BuildMovementUpdate(ByteBuffer * data, uint8 updateFlags) const
         // Unit speeds
         *data << ((Unit*)this)->GetSpeed(MOVE_WALK);
         *data << ((Unit*)this)->GetSpeed(MOVE_RUN);
-        *data << ((Unit*)this)->GetSpeed(MOVE_SWIM_BACK);
-        *data << ((Unit*)this)->GetSpeed(MOVE_SWIM);
         *data << ((Unit*)this)->GetSpeed(MOVE_RUN_BACK);
+        *data << ((Unit*)this)->GetSpeed(MOVE_SWIM);
+        *data << ((Unit*)this)->GetSpeed(MOVE_SWIM_BACK);
         *data << ((Unit*)this)->GetSpeed(MOVE_FLIGHT);
         *data << ((Unit*)this)->GetSpeed(MOVE_FLIGHT_BACK);
         *data << ((Unit*)this)->GetSpeed(MOVE_TURN_RATE);
@@ -1101,11 +1101,23 @@ void WorldObject::_Create(uint32 guidlow, HighGuid guidhigh, uint32 mapid)
 
 uint32 WorldObject::GetZoneId() const
 {
+    if (!Trinity::IsValidMapCoord(m_positionX, m_positionY, m_positionZ))
+    {
+        sLog.outDebug("Unit::GetZoneId()(%f, %f, %f) .. bad coordinates!",m_positionX, m_positionY, m_positionZ);
+        return 0;
+    }
+
     return GetBaseMap()->GetZoneId(m_positionX, m_positionY, m_positionZ);
 }
 
 uint32 WorldObject::GetAreaId() const
 {
+    if (!Trinity::IsValidMapCoord(m_positionX, m_positionY, m_positionZ))
+    {
+        sLog.outDebug("Unit::GetAreaId()(%f, %f, %f) .. bad coordinates!",m_positionX, m_positionY, m_positionZ);
+        return 0;
+    }
+
     return GetBaseMap()->GetAreaId(m_positionX, m_positionY, m_positionZ);
 }
 
@@ -1715,7 +1727,7 @@ Map* WorldObject::_findMap()
 
 Map const* WorldObject::GetBaseMap() const
 {
-    return sMapMgr.CreateBaseMap(GetMapId());
+    return GetMap()->GetParent();
 }
 
 void WorldObject::AddObjectToRemoveList()

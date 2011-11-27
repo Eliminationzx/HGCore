@@ -22,6 +22,7 @@
 #define _PLAYER_H
 
 #include "Common.h"
+
 #include "ItemPrototype.h"
 #include "Unit.h"
 #include "Item.h"
@@ -37,7 +38,7 @@
 #include "MapReference.h"
 #include "Util.h"                                           // for Tokens typedef
 #include "ReputationMgr.h"
-
+#include "World.h"
 #include "SpellMgr.h"       // for GetSpellBaseCastTime
 
 #include<string>
@@ -2070,6 +2071,8 @@ class TRINITY_DLL_SPEC Player : public Unit
 
         void SendCinematicStart(uint32 CinematicSequenceId);
 
+        float GetXPRate(Rates rate);
+
         /*********************************************************/
         /***                 INSTANCE SYSTEM                   ***/
         /*********************************************************/
@@ -2147,6 +2150,9 @@ class TRINITY_DLL_SPEC Player : public Unit
         uint64 getFollowingGM() {return m_GMfollow_GUID;}
 
         PlayerAI *AI() const{ return (PlayerAI*)i_AI; }
+
+        uint32 GetCachedZone() const { return m_zoneUpdateId; }
+        uint32 GetCachedArea() const { return m_areaUpdateId; }
 
     protected:
 
