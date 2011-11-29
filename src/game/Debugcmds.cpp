@@ -42,7 +42,7 @@
 
 #define COMMAND_COOLDOWN 2
 
-bool ChatHandler::HandleAddWPCommand(const char* args)
+bool ChatHandler::HandleWPToFileCommand(const char* args)
 {
     std::fstream file;
     file.open("waypoints.txt", std::ios_base::app);
@@ -105,23 +105,7 @@ bool ChatHandler::HandleRelocateCreatureCommand(const char* args)
     return true;
 }
 
-
-bool ChatHandler::HandleDebugInArcCommand(const char* /*args*/)
-{
-    Object *obj = getSelectedUnit();
-
-    if (!obj)
-    {
-        SendSysMessage(LANG_SELECT_CHAR_OR_CREATURE);
-        return true;
-    }
-
-    SendSysMessage(LANG_NOT_IMPLEMENTED);
-
-    return true;
-}
-
-bool ChatHandler::HandleDebugSpellFailCommand(const char* args)
+bool ChatHandler::HandleDebugSendSpellFailCommand(const char* args)
 {
     if (!args)
         return false;
@@ -132,15 +116,29 @@ bool ChatHandler::HandleDebugSpellFailCommand(const char* args)
 
     uint8 failnum = (uint8)atoi(px);
 
+    if (!failnum && *px!='0')
+        return false;
+
+    char* p1 = strtok(NULL, " ");
+    uint8 failarg1 = p1 ? (uint8)atoi(p1) : 0;
+
+    char* p2 = strtok(NULL, " ");
+    uint8 failarg2 = p2 ? (uint8)atoi(p2) : 0;
+
     WorldPacket data(SMSG_CAST_FAILED, 5);
     data << uint32(133);
     data << uint8(failnum);
+    if (p1 || p2)
+        data << uint32(failarg1);
+    if (p2)
+        data << uint32(failarg2);
+
     m_session->SendPacket(&data);
 
     return true;
 }
 
-bool ChatHandler::HandleSetPoiCommand(const char* args)
+bool ChatHandler::HandleDebugSendPoiCommand(const char* args)
 {
     Player *pPlayer = m_session->GetPlayer();
     Unit* target = getSelectedUnit();
@@ -166,7 +164,7 @@ bool ChatHandler::HandleSetPoiCommand(const char* args)
     return true;
 }
 
-bool ChatHandler::HandleEquipErrorCommand(const char* args)
+bool ChatHandler::HandleDebugSendEquipErrorCommand(const char* args)
 {
     if (!args)
         return false;
@@ -176,7 +174,7 @@ bool ChatHandler::HandleEquipErrorCommand(const char* args)
     return true;
 }
 
-bool ChatHandler::HandleSellErrorCommand(const char* args)
+bool ChatHandler::HandleDebugSendSellErrorCommand(const char* args)
 {
     if (!args)
         return false;
@@ -186,7 +184,7 @@ bool ChatHandler::HandleSellErrorCommand(const char* args)
     return true;
 }
 
-bool ChatHandler::HandleBuyErrorCommand(const char* args)
+bool ChatHandler::HandleDebugSendBuyErrorCommand(const char* args)
 {
     if (!args)
         return false;
@@ -196,7 +194,7 @@ bool ChatHandler::HandleBuyErrorCommand(const char* args)
     return true;
 }
 
-bool ChatHandler::HandleSendOpcodeCommand(const char* /*args*/)
+bool ChatHandler::HandleDebugSendOpcodeCommand(const char* /*args*/)
 {
     Unit *unit = getSelectedUnit();
     Player *player = NULL;
@@ -293,7 +291,7 @@ bool ChatHandler::HandleSendOpcodeCommand(const char* /*args*/)
     return true;
 }
 
-bool ChatHandler::HandleUpdateWorldStateCommand(const char* args)
+bool ChatHandler::HandleDebugUpdateWorldStateCommand(const char* args)
 {
     char* w = strtok((char*)args, " ");
     char* s = strtok(NULL, " ");
@@ -307,8 +305,32 @@ bool ChatHandler::HandleUpdateWorldStateCommand(const char* args)
     return true;
 }
 
+bool ChatHandler::HandleDebugPlayCinematicCommand(const char* args)
+{
+    // USAGE: .debug play cinematic #cinematicid
+    // #cinematicid - ID decimal number from CinemaicSequences.dbc (1st column)
+    if (!*args)
+    {
+        SendSysMessage(LANG_BAD_VALUE);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    uint32 dwId = atoi((char*)args);
+
+    if (!sCinematicSequencesStore.LookupEntry(dwId))
+    {
+        PSendSysMessage(LANG_CINEMATIC_NOT_EXIST, dwId);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    m_session->GetPlayer()->SendCinematicStart(dwId);
+    return true;
+}
+
 //Play sound
-bool ChatHandler::HandlePlaySoundCommand(const char* args)
+bool ChatHandler::HandleDebugPlaySoundCommand(const char* args)
 {
     // USAGE: .debug playsound #soundid
     // #soundid - ID decimal number from SoundEntries.dbc (1st column)
@@ -346,7 +368,7 @@ bool ChatHandler::HandlePlaySoundCommand(const char* args)
 }
 
 //Send notification in channel
-bool ChatHandler::HandleSendChannelNotifyCommand(const char* args)
+bool ChatHandler::HandleDebugSendChannelNotifyCommand(const char* args)
 {
     if (!args)
         return false;
@@ -364,7 +386,7 @@ bool ChatHandler::HandleSendChannelNotifyCommand(const char* args)
 }
 
 //Send notification in chat
-bool ChatHandler::HandleSendChatMsgCommand(const char* args)
+bool ChatHandler::HandleDebugSendChatMsgCommand(const char* args)
 {
     if (!args)
         return false;
@@ -377,14 +399,14 @@ bool ChatHandler::HandleSendChatMsgCommand(const char* args)
     return true;
 }
 
-bool ChatHandler::HandleSendQuestPartyMsgCommand(const char* args)
+bool ChatHandler::HandleDebugSendQuestPartyMsgCommand(const char* args)
 {
     uint32 msg = atol((char*)args);
     m_session->GetPlayer()->SendPushToPartyResponse(m_session->GetPlayer(), msg);
     return true;
 }
 
-bool ChatHandler::HandleGetLootRecipient(const char* /*args*/)
+bool ChatHandler::HandleDebugGetLootRecipient(const char* /*args*/)
 {
     Creature* target = getSelectedCreature();
     if (!target)
@@ -394,14 +416,14 @@ bool ChatHandler::HandleGetLootRecipient(const char* /*args*/)
     return true;
 }
 
-bool ChatHandler::HandleSendQuestInvalidMsgCommand(const char* args)
+bool ChatHandler::HandleDebugSendQuestInvalidMsgCommand(const char* args)
 {
     uint32 msg = atol((char*)args);
     m_session->GetPlayer()->SendCanTakeQuestResponse(msg);
     return true;
 }
 
-bool ChatHandler::HandleGetItemState(const char* args)
+bool ChatHandler::HandleDebugGetItemState(const char* args)
 {
     if (!args)
         return false;
@@ -700,7 +722,7 @@ bool ChatHandler::HandleDebugHostilRefList(const char * /*args*/)
     return true;
 }
 
-bool ChatHandler::HandleSetInstanceDataCommand(const char *args)
+bool ChatHandler::HandleDebugSetInstanceDataCommand(const char *args)
 {
     if (!args || !m_session->GetPlayer())
         return false;
@@ -728,7 +750,7 @@ bool ChatHandler::HandleSetInstanceDataCommand(const char *args)
     return true;
 }
 
-bool ChatHandler::HandleGetInstanceDataCommand(const char *args)
+bool ChatHandler::HandleDebugGetInstanceDataCommand(const char *args)
 {
     if (!args || !m_session->GetPlayer())
         return false;
@@ -753,7 +775,7 @@ bool ChatHandler::HandleGetInstanceDataCommand(const char *args)
     return true;
 }
 
-bool ChatHandler::HandleSetInstanceData64Command(const char *args)
+bool ChatHandler::HandleDebugSetInstanceData64Command(const char *args)
 {
     if (!args || !m_session->GetPlayer())
         return false;
@@ -781,7 +803,7 @@ bool ChatHandler::HandleSetInstanceData64Command(const char *args)
     return true;
 }
 
-bool ChatHandler::HandleGetInstanceData64Command(const char *args)
+bool ChatHandler::HandleDebugGetInstanceData64Command(const char *args)
 {
     if (!args || !m_session->GetPlayer())
         return false;
@@ -806,65 +828,3 @@ bool ChatHandler::HandleGetInstanceData64Command(const char *args)
     return true;
 }
 
-bool ChatHandler::HandleGetPoolObjectStatsCommand(const char *args)
-{
-    if(!m_session->GetPlayer())
-        return false;
-
-    char *sEntry = strtok((char*)args, " ");
-    char *sRange = strtok(NULL, " ");
-    uint32 entry = atoi(sEntry);
-    uint32 range = atoi(sRange);
-
-    Map *map = m_session->GetPlayer()->GetMap();
-
-    std::list<GameObject*> pList;
-    Trinity::AllGameObjectsWithEntryInGrid u_check(entry);
-    Trinity::GameObjectListSearcher<Trinity::AllGameObjectsWithEntryInGrid> searcher(pList, u_check);
-    Cell::VisitAllObjects(m_session->GetPlayer(), searcher, range);
-
-    UNORDERED_MAP<uint16, uint32> map_unspawned;
-    UNORDERED_MAP<uint16, uint32> map_poolspawned;
-    UNORDERED_MAP<uint16, uint32> map_worldspawned;
-
-    for(std::list<GameObject*>::iterator it = pList.begin(); it != pList.end(); it++)
-    {
-        GameObject *pGO = *it;
-        uint16 poolid = poolhandler.IsPartOfAPool(pGO->GetGUIDLow(), TYPEID_GAMEOBJECT);
-        bool poolspawned = poolhandler.IsSpawnedObject(poolid, pGO->GetGUIDLow(), TYPEID_GAMEOBJECT);
-        bool gospawned = pGO->isSpawned();
-
-        if(poolid && gospawned && !poolspawned)
-        {
-            PSendSysMessage("Gameobject %u is part of pool %u and is spawned in world but not spawned in pool", pGO->GetGUIDLow(), poolid);
-        }
-        else
-        {
-            if(map_unspawned.find(poolid) == map_unspawned.end())
-            {
-                map_unspawned[poolid] = 0; // .insert(UNORDERED_MAP<unit16, uint32>::mapped_type(poolid, 0));
-                map_poolspawned[poolid] = 0; //.insert(UNORDERED_MAP<unit16, uint32>::mapped_type(poolid, 0));
-                map_worldspawned[poolid] = 0; //.insert(UNORDERED_MAP<unit16, uint32>::mapped_type(poolid, 0));
-            }
-            UNORDERED_MAP<uint16, uint32> *mapToAdd = NULL;
-            if(gospawned)
-                mapToAdd = &map_worldspawned;
-            else if(poolspawned)
-                mapToAdd = &map_poolspawned;
-            else
-                mapToAdd = &map_unspawned;
-            (*mapToAdd)[poolid]++;
-        }
-    }
-
-    if(map_unspawned.empty())
-        PSendSysMessage("No objects found");
-    else 
-        PSendSysMessage("Poolid | spawned in world | spawned in pool | not spawned");
-
-    for(UNORDERED_MAP<uint16, uint32>::iterator it = map_unspawned.begin(); it != map_unspawned.end(); it++)
-    {    
-        PSendSysMessage("%u | %u | %u | %u", (uint32)(it->first), map_worldspawned.find(it->first)->second, map_poolspawned.find(it->first)->second, it->second);
-    }
-    return true;
-}

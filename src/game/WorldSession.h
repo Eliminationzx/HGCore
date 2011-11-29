@@ -379,7 +379,6 @@ class TRINITY_DLL_SPEC WorldSession
         void HandleAreaTriggerOpcode(WorldPacket& recvPacket);
 
         void HandleSetFactionAtWar(WorldPacket & recv_data);
-        void HandleSetFactionCheat(WorldPacket & recv_data);
         void HandleSetWatchedFactionIndexOpcode(WorldPacket & recv_data);
         void HandleSetWatchedFactionInactiveOpcode(WorldPacket & recv_data);
 
@@ -464,7 +463,7 @@ class TRINITY_DLL_SPEC WorldSession
         void HandleGuildSaveEmblemOpcode(WorldPacket& recvPacket);
 
         void HandleTaxiNodeStatusQueryOpcode(WorldPacket& recvPacket);
-        void HandleTaxiQueryAvailableNodesOpcode(WorldPacket& recvPacket);
+        void HandleTaxiQueryAvailableNodes(WorldPacket& recvPacket);
         void HandleActivateTaxiOpcode(WorldPacket& recvPacket);
         void HandleActivateTaxiFarOpcode(WorldPacket& recvPacket);
         void HandleMoveSplineDoneOpcode(WorldPacket& recvPacket);
