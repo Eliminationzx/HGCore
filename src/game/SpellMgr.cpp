@@ -2785,6 +2785,20 @@ void SpellMgr::LoadSpellCustomAttr()
             spellInfo->AttributesCu |= SPELL_ATTR_CU_FAKE_DELAY;
             break;
         /* UNSORTED */
+        /* Damage Corrections */
+        case 16785: // Flamebreak
+            spellInfo->EffectBasePoints[0] = 24;
+            break;
+        case 17289: // Shadow Shock
+            spellInfo->EffectBasePoints[0] = 74;
+            break;
+        case 34934: // Shadow Bolt Volley
+            spellInfo->EffectBasePoints[0] = 124;
+            break;
+        case 40317: // Throw
+            spellInfo->EffectBasePoints[0] = 199;
+            break;
+        /****************/
         case 39042: // Rampant Infection
             spellInfo->MaxAffectedTargets = 1;
             break;
@@ -3131,6 +3145,10 @@ void SpellMgr::LoadCustomSpellCooldowns(SpellEntry* spellInfo)
         // 30 min cooldown
         case 44520:
             spellInfo->RecoveryTime = 1800000;
+            break;
+        // 3h cooldown
+        case 16054: // Flames of the Black Flight
+            spellInfo->RecoveryTime = 10800000;
             break;
         default:
             break;
