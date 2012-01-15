@@ -4909,8 +4909,9 @@ void Aura::HandlePeriodicTriggerSpell(bool apply, bool Real)
             }
             case 43648: // Electrical Storm makes target levitating
             {
-                if (m_target->HasUnitMovementFlag(MOVEFLAG_LEVITATING))
-                    m_target->RemoveUnitMovementFlag(MOVEFLAG_LEVITATING);
+                if (m_target->GetTypeId() != TYPEID_PLAYER)
+                    return;
+                ((Player*)m_target)->SetFlying(false);
                 break;
             }
             case 40106: // Merge
@@ -4962,8 +4963,9 @@ void Aura::HandlePeriodicTriggerSpell(bool apply, bool Real)
             }
             case 43648: // Electrical Storm - stop levitating when spell ends
             {
-                if (!m_target->HasUnitMovementFlag(MOVEFLAG_LEVITATING))
-                    m_target->SetUnitMovementFlags(MOVEFLAG_LEVITATING);
+                if (m_target->GetTypeId() != TYPEID_PLAYER)
+                    return;
+                ((Player*)m_target)->SetFlying(true);
                 break;
             }
         }
