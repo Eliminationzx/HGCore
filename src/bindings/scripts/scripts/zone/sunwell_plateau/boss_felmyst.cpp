@@ -210,6 +210,7 @@ struct TRINITY_DLL_DECL boss_felmystAI : public ScriptedAI
         m_creature->SetFloatValue(UNIT_FIELD_COMBATREACH, 10);
         m_creature->setActive(true);
         m_creature->SetWalk(false);
+        DespawnSummons();   // for unyielding dead summoned by trigger
 
         if(pInstance)
             pInstance->SetData(DATA_FELMYST_EVENT, NOT_STARTED);
@@ -262,7 +263,7 @@ struct TRINITY_DLL_DECL boss_felmystAI : public ScriptedAI
 
     void KilledUnit(Unit* victim)
     {
-        if(!urand(0,3))
+        if(roll_chance_i(15))
             DoScriptText(RAND(YELL_KILL1, YELL_KILL2), m_creature);
     }
 
@@ -295,6 +296,19 @@ struct TRINITY_DLL_DECL boss_felmystAI : public ScriptedAI
                 if(p->isAlive() && p->HasAura(SPELL_FOG_CHARM, 0))
                     me->Kill(p, false);
             }
+    }
+
+    void DespawnSummons()
+    {
+        std::list<uint64> AddList = me->GetMap()->GetCreaturesGUIDList(MOB_UNYIELDING_DEAD, GET_FIRST_CREATURE_GUID, 0);
+        if (AddList.empty())
+            return;
+
+        for (std::list<uint64>::iterator i = AddList.begin(); i!= AddList.end(); ++i)
+        {
+            if(Creature* Skeleton = me->GetCreature(*i))
+                Skeleton->ForcedDespawn();
+        }
     }
 
     void JustSummoned(Creature *summon)
