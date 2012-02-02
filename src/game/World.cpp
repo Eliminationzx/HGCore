@@ -92,6 +92,15 @@ int32 World::m_visibility_notify_periodInBGArenas   = DEFAULT_VISIBILITY_NOTIFY_
 int32 World::m_activeObjectUpdateDistanceOnContinents = DEFAULT_VISIBILITY_DISTANCE;
 int32 World::m_activeObjectUpdateDistanceInInstances = DEFAULT_VISIBILITY_DISTANCE;
 
+void MapUpdateDiffInfo::PrintCumulativeMapUpdateDiff()
+{
+    for (int i = DIFF_SESSION_UPDATE; i < DIFF_MAX_CUMULATIVE_INFO; i++)
+    {
+        if (_cumulativeDiffInfo[i] >= sWorld.getConfig(CONFIG_MIN_LOG_UPDATE))
+            sLog.outDiff("Cumulative Map Update for: %u - %u", i, _cumulativeDiffInfo[i]);
+    }
+}
+
 /// World constructor
 World::World()
 {
@@ -572,6 +581,8 @@ void World::LoadConfigSettings(bool reload)
     m_configs[CONFIG_AUTOBROADCAST_INTERVAL] = (sConfig.GetIntDefault("AutoBroadcast.Timer", 35)*MINUTE*1000);
     m_configs[CONFIG_GUILD_ANN_INTERVAL] = (sConfig.GetIntDefault("GuildAnnounce.Timer", 1)*MINUTE*1000);
     m_configs[CONFIG_GUILD_ANN_COOLDOWN] = (sConfig.GetIntDefault("GuildAnnounce.Cooldown", 60)*MINUTE);
+
+    m_configs[CONFIG_ENABLE_PASSIVE_ANTICHEAT] = sConfig.GetIntDefault("AntiCheat.Enable", 1);
 
     m_configs[CONFIG_RETURNOLDMAILS_MODE] = sConfig.GetIntDefault("Mail.OldReturnMode", 0);
     m_configs[CONFIG_RETURNOLDMAILS_INTERVAL] = sConfig.GetIntDefault("Mail.OldReturnTimer", 60);
@@ -1579,7 +1590,7 @@ void World::SetInitialWorldSettings()
     CleanupDeletedChars();
 
     sLog.outString("Activating AntiCheat");
-    if (m_ac.activate() == -1)
+    if (sWorld.getConfig(CONFIG_ENABLE_PASSIVE_ANTICHEAT) && m_ac.activate() == -1)
         sLog.outString("Couldn't activate AntiCheat");
 
     sLog.outString("WORLD: World initialized");
@@ -1652,6 +1663,34 @@ uint32 World::RecordTimeDiff(const char *text, ...)
     }
 
     m_currentTime = thisTime;
+
+    return diff;
+}
+
+uint32 World::RecordSessionTimeDiff(const char *text, ...)
+{
+    if (m_updateTimeCount != 1)
+        return 0;
+    if (!text)
+    {
+        m_currentSessionTime = WorldTimer::getMSTime();
+        return 0;
+    }
+
+    uint32 thisTime = WorldTimer::getMSTime();
+    uint32 diff = WorldTimer::getMSTimeDiff(m_currentSessionTime, thisTime);
+
+    if (diff > m_configs[CONFIG_MIN_LOG_UPDATE])
+    {
+        va_list ap;
+        char str [256];
+        va_start(ap, text);
+        vsnprintf(str,256,text, ap);
+        va_end(ap);
+        sLog.outDiff("Session Difftime %s: %u.", str, diff);
+    }
+
+    m_currentSessionTime = thisTime;
 
     return diff;
 }
@@ -1776,11 +1815,14 @@ void World::Update(uint32 diff)
 
         UpdateSessions(diff);
 
+        RecordTimeDiff("UpdateSessions");
+
         // Update groups
         for (ObjectMgr::GroupSet::iterator itr = objmgr.GetGroupSetBegin(); itr != objmgr.GetGroupSetEnd(); ++itr)
             (*itr)->Update(diff);
+
+        RecordTimeDiff("UpdateGroups");
     }
-    RecordTimeDiff("UpdateSessions");
 
     /// <li> Handle weather updates when the timer has passed
     if (m_timers[WUPDATE_WEATHERS].Passed())
@@ -1802,6 +1844,7 @@ void World::Update(uint32 diff)
                 delete temp;
             }
         }
+        RecordTimeDiff("UpdateWeathers");
     }
 
     /// <li> Update uptime table
@@ -1831,8 +1874,8 @@ void World::Update(uint32 diff)
 
             sWorld.SendWorldText(LANG_AUTO_ANN, msg.c_str());
         }
+        RecordTimeDiff("Send Autobroadcast");
     }
-    RecordTimeDiff("Send Autobroadcast");
 
     ///- send guild announces every one minute
     if (m_timers[WUPDATE_GUILD_ANNOUNCES].Passed())
@@ -1855,13 +1898,17 @@ void World::Update(uint32 diff)
             sWorld.SendGuildAnnounce(PAIR64_HIPART(itr->first), guildName.c_str(), itr->second.c_str());
             m_GuildAnnounces[1].pop_front();
         }
+        RecordTimeDiff("Send Guild announce");
     }
-    RecordTimeDiff("Send Guild announce");
 
     /// <li> Handle all other objects
     ///- Update objects when the timer has passed (maps, transport, creatures,...)
-    sMapMgr.Update(diff);                // As interval = 0
-    RecordTimeDiff("MapManager::update");
+    MapUpdateDiff().ClearDiffInfo();
+    {
+        sMapMgr.Update(diff);                // As interval = 0
+        RecordTimeDiff("MapManager::update");
+    }
+    MapUpdateDiff().PrintCumulativeMapUpdateDiff();
 
     sBattleGroundMgr.Update(diff);
     RecordTimeDiff("UpdateBattleGroundMgr");
@@ -1874,6 +1921,7 @@ void World::Update(uint32 diff)
     {
         m_timers[WUPDATE_DELETECHARS].Reset();
         CleanupDeletedChars();
+        RecordTimeDiff("CleanupDeletedChars");
     }
 
     // execute callbacks from sql queries that were queued recently
@@ -1886,6 +1934,7 @@ void World::Update(uint32 diff)
         m_timers[WUPDATE_CORPSES].Reset();
 
         ObjectAccessor::Instance().RemoveOldCorpses();
+        RecordTimeDiff("RemoveOldCorpses");
     }
 
     ///- Process Game events when necessary
@@ -1896,8 +1945,8 @@ void World::Update(uint32 diff)
         uint32 nextGameEvent = gameeventmgr.Update();
         m_timers[WUPDATE_EVENTS].SetInterval(nextGameEvent);
         m_timers[WUPDATE_EVENTS].Reset();
+        RecordTimeDiff("UpdateGameEvents");
     }
-    RecordTimeDiff("UpdateGameEvents");
 
     /// </ul>
 
