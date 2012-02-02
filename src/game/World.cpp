@@ -1658,6 +1658,34 @@ uint32 World::RecordTimeDiff(const char *text, ...)
     return diff;
 }
 
+uint32 World::RecordSessionTimeDiff(const char *text, ...)
+{
+    if (m_updateTimeCount != 1)
+        return 0;
+    if (!text)
+    {
+        m_currentSessionTime = WorldTimer::getMSTime();
+        return 0;
+    }
+
+    uint32 thisTime = WorldTimer::getMSTime();
+    uint32 diff = WorldTimer::getMSTimeDiff(m_currentSessionTime, thisTime);
+
+    if (diff > m_configs[CONFIG_MIN_LOG_UPDATE])
+    {
+        va_list ap;
+        char str [256];
+        va_start(ap, text);
+        vsnprintf(str,256,text, ap);
+        va_end(ap);
+        sLog.outDiff("Session Difftime %s: %u.", str, diff);
+    }
+
+    m_currentSessionTime = thisTime;
+
+    return diff;
+}
+
 void World::LoadAutobroadcasts()
 {
     m_Autobroadcasts.clear();
@@ -1778,11 +1806,14 @@ void World::Update(uint32 diff)
 
         UpdateSessions(diff);
 
+        RecordTimeDiff("UpdateSessions");
+
         // Update groups
         for (ObjectMgr::GroupSet::iterator itr = objmgr.GetGroupSetBegin(); itr != objmgr.GetGroupSetEnd(); ++itr)
             (*itr)->Update(diff);
+
+        RecordTimeDiff("UpdateGroups");
     }
-    RecordTimeDiff("UpdateSessions");
 
     /// <li> Handle weather updates when the timer has passed
     if (m_timers[WUPDATE_WEATHERS].Passed())
@@ -1804,6 +1835,7 @@ void World::Update(uint32 diff)
                 delete temp;
             }
         }
+        RecordTimeDiff("UpdateWeathers");
     }
 
     /// <li> Update uptime table
@@ -1833,8 +1865,8 @@ void World::Update(uint32 diff)
 
             sWorld.SendWorldText(LANG_AUTO_ANN, msg.c_str());
         }
+        RecordTimeDiff("Send Autobroadcast");
     }
-    RecordTimeDiff("Send Autobroadcast");
 
     ///- send guild announces every one minute
     if (m_timers[WUPDATE_GUILD_ANNOUNCES].Passed())
@@ -1857,8 +1889,8 @@ void World::Update(uint32 diff)
             sWorld.SendGuildAnnounce(PAIR64_HIPART(itr->first), guildName.c_str(), itr->second.c_str());
             m_GuildAnnounces[1].pop_front();
         }
+        RecordTimeDiff("Send Guild announce");
     }
-    RecordTimeDiff("Send Guild announce");
 
     /// <li> Handle all other objects
     ///- Update objects when the timer has passed (maps, transport, creatures,...)
@@ -1876,6 +1908,7 @@ void World::Update(uint32 diff)
     {
         m_timers[WUPDATE_DELETECHARS].Reset();
         CleanupDeletedChars();
+        RecordTimeDiff("CleanupDeletedChars");
     }
 
     // execute callbacks from sql queries that were queued recently
@@ -1888,6 +1921,7 @@ void World::Update(uint32 diff)
         m_timers[WUPDATE_CORPSES].Reset();
 
         ObjectAccessor::Instance().RemoveOldCorpses();
+        RecordTimeDiff("RemoveOldCorpses");
     }
 
     ///- Process Game events when necessary
@@ -1898,8 +1932,8 @@ void World::Update(uint32 diff)
         uint32 nextGameEvent = gameeventmgr.Update();
         m_timers[WUPDATE_EVENTS].SetInterval(nextGameEvent);
         m_timers[WUPDATE_EVENTS].Reset();
+        RecordTimeDiff("UpdateGameEvents");
     }
-    RecordTimeDiff("UpdateGameEvents");
 
     /// </ul>
 
