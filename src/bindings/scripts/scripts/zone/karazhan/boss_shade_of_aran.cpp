@@ -683,7 +683,6 @@ bool FlameWreathHandleEffect(Unit *pCaster, Unit* pUnit, Item* pItem, GameObject
     return true;
 }
 
-
 void AddSC_boss_shade_of_aran()
 {
     Script *newscript;
