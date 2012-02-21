@@ -299,7 +299,7 @@ Spell::Spell(Unit* Caster, SpellEntry const *info, bool triggered, uint64 origin
             break;
         default:
             // Wands
-            if (m_spellInfo->AttributesEx3 & SPELL_ATTR_EX3_REQ_WAND)
+            if (m_spellInfo->AttributesEx2 & SPELL_ATTR_EX2_AUTOREPEAT_FLAG)
             {
                 m_attackType = RANGED_ATTACK;
                 if (m_caster->getClassMask() & CLASSMASK_WAND_USERS && m_caster->GetTypeId()==TYPEID_PLAYER)
@@ -477,12 +477,8 @@ void Spell::FillTargetMap()
                         AddUnitTarget(m_caster, i);
                     break;
                 case SPELL_EFFECT_SUMMON_PLAYER:
-                    if (m_caster->GetTypeId()==TYPEID_PLAYER && ((Player*)m_caster)->GetSelection())
-                    {
-                        Player* target = objmgr.GetPlayer(((Player*)m_caster)->GetSelection());
-                        if (target)
-                            AddUnitTarget(target, i);
-                    }
+                    if (m_targets.getUnitTarget())
+                        AddUnitTarget(m_targets.getUnitTarget(), i);
                     break;
                 case SPELL_EFFECT_RESURRECT_NEW:
                     if (m_targets.getUnitTarget())
@@ -1442,29 +1438,31 @@ void Spell::SearchAreaTarget(std::list<Unit*> &TagUnitMap, float radius, const u
 
     switch (spellScriptTargetType)
     {
-        case SPELL_TARGET_TYPE_CREATURE:
+        case SPELL_TARGET_TYPE_NONE:
         {
             Trinity::SpellNotifierCreatureAndPlayer notifier(*this, TagUnitMap, radius, type, TargetType, entry, x, y, z);
-            if ((m_spellInfo->AttributesEx3 & SPELL_ATTR_EX3_PLAYERS_ONLY) || TargetType == SPELL_TARGETS_ENTRY && !entry)
-            {
-                Cell::VisitWorldObjects(x, y, m_caster->GetMap(), notifier, radius);
-                TagUnitMap.remove_if(Trinity::ObjectTypeIdCheck(TYPEID_PLAYER, false)); // above line will select also pets and totems, remove them
-            }
-            else
-                Cell::VisitAllObjects(x, y, m_caster->GetMap(), notifier, radius);
+            Cell::VisitWorldObjects(x, y, m_caster->GetMap(), notifier, radius);
+            TagUnitMap.remove_if(Trinity::ObjectIsTotemCheck(true)); // totems should not be affected by AoE spells (check if no exceptions?)
+            break;
+        }
+        case SPELL_TARGET_TYPE_CREATURE:
+        {
+            if (!entry)
+                break;
+
+            Trinity::SpellNotifierCreatureAndPlayer notifier(*this, TagUnitMap, radius, type, TargetType, entry, x, y, z);
+            Cell::VisitAllObjects(x, y, m_caster->GetMap(), notifier, radius);
+            TagUnitMap.remove_if(Trinity::ObjectTypeIdCheck(TYPEID_PLAYER, false)); // above line will select also pets and totems, remove them
             TagUnitMap.remove_if(Trinity::ObjectIsTotemCheck(true)); // totems should not be affected by AoE spells (check if no exceptions?)
             break;
         }
         case SPELL_TARGET_TYPE_DEAD:
         {
+            if (!entry)
+                break;
+
             Trinity::SpellNotifierDeadCreature notifier(*this, TagUnitMap, radius, type, TargetType, entry, x, y, z);
-            if ((m_spellInfo->AttributesEx3 & SPELL_ATTR_EX3_PLAYERS_ONLY) || TargetType == SPELL_TARGETS_ENTRY && !entry)
-            {
-                Cell::VisitWorldObjects(x, y, m_caster->GetMap(), notifier, radius);
-                TagUnitMap.remove_if(Trinity::ObjectTypeIdCheck(TYPEID_PLAYER, false)); // above line will select also pets and totems, remove them
-            }
-            else
-                Cell::VisitAllObjects(x, y, m_caster->GetMap(), notifier, radius);
+            Cell::VisitAllObjects(x, y, m_caster->GetMap(), notifier, radius);
             break;
         }
         default:
@@ -1514,17 +1512,12 @@ void Spell::SearchAreaTarget(std::list<GameObject*> &goList, float radius, const
     {
         case SPELL_TARGET_TYPE_GAMEOBJECT:
         {
-            if ((m_spellInfo->AttributesEx3 & SPELL_ATTR_EX3_PLAYERS_ONLY) || TargetType == SPELL_TARGETS_ENTRY && !entry)
-            {
-                Trinity::SpellNotifierGameObject notifier(*this, goList, radius, type, TargetType, entry, x, y, z);
-                Cell::VisitWorldObjects(x, y, m_caster->GetMap(), notifier, radius);
-            }
-            else
-            {
-                Trinity::AllGameObjectsWithEntryInGrid go_check(entry);
-                Trinity::GameObjectListSearcher<Trinity::AllGameObjectsWithEntryInGrid> go_search(goList, go_check);
-                Cell::VisitGridObjects(x, y, m_caster->GetMap(), go_search, radius);
-            }
+            if (!entry)
+                break;
+
+            Trinity::AllGameObjectsWithEntryInGrid go_check(entry);
+            Trinity::GameObjectListSearcher<Trinity::AllGameObjectsWithEntryInGrid> go_search(goList, go_check);
+            Cell::VisitGridObjects(x, y, m_caster->GetMap(), go_search, radius);
             break;
         }
         default:
@@ -1657,7 +1650,7 @@ void Spell::SetTargetMap(uint32 i, uint32 cur)
                     //AddUnitTarget(m_caster, i);
                     float min_dis = GetSpellMinRange(sSpellRangeStore.LookupEntry(m_spellInfo->rangeIndex));
                     float max_dis = GetSpellMaxRange(sSpellRangeStore.LookupEntry(m_spellInfo->rangeIndex));
-                    float dis = m_caster->GetMap()->rand_norm() * (max_dis - min_dis) + min_dis;
+                    float dis = rand_norm() * (max_dis - min_dis) + min_dis;
                     float x, y, z;
                     m_caster->GetClosePoint(x, y, z, DEFAULT_WORLD_OBJECT_SIZE, dis);
                     m_targets.setDestination(x, y, z);
@@ -1789,7 +1782,7 @@ void Spell::SetTargetMap(uint32 i, uint32 cur)
             if (dist < objSize)
                 dist = objSize;
             else if (cur == TARGET_DEST_CASTER_RANDOM)
-              dist = objSize + (dist - objSize) * m_caster->GetMap()->rand_norm();
+              dist = objSize + (dist - objSize) * rand_norm();
 
             switch (cur)
             {
@@ -1833,7 +1826,7 @@ void Spell::SetTargetMap(uint32 i, uint32 cur)
             if (dist < objSize)
                 dist = objSize;
             else if (cur == TARGET_DEST_CASTER_RANDOM)
-              dist = objSize + (dist - objSize) * m_caster->GetMap()->rand_norm();
+              dist = objSize + (dist - objSize) * rand_norm();
 
             switch (cur)
             {
@@ -1845,7 +1838,7 @@ void Spell::SetTargetMap(uint32 i, uint32 cur)
                 case TARGET_DEST_TARGET_BACK_LEFT:  angle = -3*M_PI/4;  break;
                 case TARGET_DEST_TARGET_BACK_RIGHT: angle = 3*M_PI/4;   break;
                 case TARGET_DEST_TARGET_FRONT_RIGHT:angle = M_PI/4;     break;
-            default:                            angle = m_caster->GetMap()->rand_norm()*2*M_PI; break;
+                default:                            angle = rand_norm()*2*M_PI; break;
             }
 
             target->GetGroundPointAroundUnit(x, y, z, dist, angle);
@@ -1878,13 +1871,13 @@ void Spell::SetTargetMap(uint32 i, uint32 cur)
                 case TARGET_DEST_DEST_BACK_LEFT:  angle = -3*M_PI/4;  break;
                 case TARGET_DEST_DEST_BACK_RIGHT: angle = 3*M_PI/4;   break;
                 case TARGET_DEST_DEST_FRONT_RIGHT:angle = M_PI/4;     break;
-            default:                          angle = m_caster->GetMap()->rand_norm()*2*M_PI; break;
+                default:                          angle = rand_norm()*2*M_PI; break;
             }
 
             float dist, x, y, z;
             dist = GetSpellRadius(m_spellInfo,i,true);
             if (cur == TARGET_DEST_DEST_RANDOM)
-              dist *= m_caster->GetMap()->rand_norm();
+              dist *= rand_norm();
 
             x = m_targets.m_destX;
             y = m_targets.m_destY;
@@ -2036,8 +2029,8 @@ void Spell::SetTargetMap(uint32 i, uint32 cur)
         if (modOwner)
             modOwner->ApplySpellMod(m_spellInfo->Id, SPELLMOD_RADIUS, radius, this);
 
-        if(radius > 333)
-            radius = 333;
+        if (radius > MAX_VISIBILITY_DISTANCE)
+            radius = MAX_VISIBILITY_DISTANCE;
 
         std::list<Unit*> unitList;
         std::list<GameObject*> goList;
@@ -2216,6 +2209,16 @@ void Spell::prepare(SpellCastTargets * targets, Aura* triggeredByAura)
     if (triggeredByAura)
         m_triggeredByAuraSpell = triggeredByAura->GetSpellProto();
 
+    if ((!m_IsTriggeredSpell && !IsChanneledSpell(m_spellInfo) ? m_spellInfo->InterruptFlags & SPELL_INTERRUPT_FLAG_MOVEMENT : m_spellInfo->ChannelInterruptFlags & CHANNEL_FLAG_MOVEMENT))
+    {
+        m_caster->addUnitState(UNIT_STAT_CASTING_NOT_MOVE);
+        if (m_caster->GetTypeId() == TYPEID_UNIT)
+        {
+            m_caster->GetMotionMaster()->StopMovement();
+            //m_caster->DisableSpline();
+        }
+    }
+
     m_caster->GetPosition(m_cast);
 
     // create and add update event for this spell
@@ -2376,9 +2379,6 @@ void Spell::cancel()
 
 void Spell::cast(bool skipCheck)
 {
-    if (m_caster->hasUnitState(UNIT_STAT_CASTING_NOT_MOVE))
-        m_caster->StopMoving();
-
     SpellEntry const* spellInfo = sSpellStore.LookupEntry(m_spellInfo->Id);
     if (!spellInfo)
         return;
@@ -2832,8 +2832,13 @@ void Spell::update(uint32 difftime)
     if (m_timer != 0 && m_caster->hasUnitState(UNIT_STAT_CASTING_NOT_MOVE) && !m_caster->HasUnitMovementFlag(MOVEFLAG_FALLINGFAR))
     {
         // add little offset for creature stop movement
-        if (!m_caster->IsInRange2d(m_cast.x, m_cast.y, 0.0f, 1.5f) && !IsNextMeleeSwingSpell() && !IsAutoRepeat() && !m_IsTriggeredSpell)
-            cancel();
+        if (!IsNextMeleeSwingSpell() && !IsAutoRepeat() && !m_IsTriggeredSpell)
+        {
+             Position casterPos;
+             m_caster->GetPosition(casterPos);
+             if (m_cast != casterPos)
+                cancel();
+        }
     }
 
     switch (m_spellState)
@@ -3553,7 +3558,7 @@ void Spell::TakePower()
     if (hit || (NeedsComboPoints(m_spellInfo) && m_caster->GetTypeId() == TYPEID_PLAYER && ((Player*)m_caster)->GetClass() == CLASS_DRUID) )  // not sure if it's limited only to druid
         m_caster->ModifyPower(powerType, -m_powerCost);
     else
-        m_caster->ModifyPower(powerType, -m_caster->GetMap()->irand(0, m_powerCost/4));
+        m_caster->ModifyPower(powerType, -irand(0, m_powerCost/4));
 
     // Set the five second timer
     if (powerType == POWER_MANA && m_powerCost > 0)
@@ -3707,11 +3712,9 @@ SpellCastResult Spell::CheckCast(bool strict)
 
     // cancel autorepeat spells if cast start when moving
     // (not wand currently autorepeat cast delayed to moving stop anyway in spell update code)
-    if (m_caster->GetTypeId()==TYPEID_PLAYER && ((Player*)m_caster)->isMoving())
+    if (m_caster->GetTypeId()==TYPEID_PLAYER && m_caster->ToPlayer()->isMoving())
     {
-        // skip stuck spell to allow use it in falling case and apply spell limitations at movement
-        if ((!m_caster->HasUnitMovementFlag(MOVEFLAG_FALLINGFAR) || m_spellInfo->Effect[0] != SPELL_EFFECT_STUCK) &&
-            (IsAutoRepeat() || (m_spellInfo->AuraInterruptFlags & AURA_INTERRUPT_FLAG_NOT_SEATED) != 0))
+        if (!m_caster->HasUnitMovementFlag(MOVEFLAG_FALLINGFAR) && IsAutoRepeat())
             return SPELL_FAILED_MOVING;
     }
 
@@ -4111,7 +4114,7 @@ SpellCastResult Spell::CheckCast(bool strict)
                 // chance for fail at orange skinning attempt
                 if ((m_selfContainer && (*m_selfContainer) == this) &&
                     skillValue < sWorld.GetConfigMaxSkillValue() &&
-                    (ReqValue < 0 ? 0 : ReqValue) > m_caster->GetMap()->irand(skillValue-25, skillValue+37))
+                    (ReqValue < 0 ? 0 : ReqValue) > irand(skillValue-25, skillValue+37))
                     return SPELL_FAILED_TRY_AGAIN;
 
                 break;
@@ -4245,8 +4248,8 @@ SpellCastResult Spell::CheckCast(bool strict)
                 if (!dynamic_cast<Player *>(m_caster)->GetSelection())
                     return SPELL_FAILED_BAD_TARGETS;
 
-                Player* target = objmgr.GetPlayer(dynamic_cast<Player *>(m_caster)->GetSelection());
-                if (!target || m_caster == target || !target->IsInSameRaidWith(dynamic_cast<Player *>(m_caster)))
+                Player* target = m_targets.getUnitTarget()->ToPlayer();
+                if (!target || m_caster == target || !target->IsInSameGroupWith(dynamic_cast<Player *>(m_caster)))
                     return SPELL_FAILED_BAD_TARGETS;
 
                 if (m_caster->ToPlayer() && m_caster->ToPlayer()->GetBattleGround())

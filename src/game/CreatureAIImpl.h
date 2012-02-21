@@ -537,6 +537,9 @@ inline bool CreatureAI::UpdateVictim()
     if (!me->isInCombat())
         return false;
 
+    if (me->hasUnitState(UNIT_STAT_LOST_CONTROL))
+        return me->getVictim();
+
     if (me->getVictim())
     {
         if (me->IsNonMeleeSpellCasted(false))

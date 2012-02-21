@@ -3862,7 +3862,6 @@ void Aura::HandleModConfuse(bool apply, bool Real)
     if (!Real)
         return;
 
-    //m_target->SetConfused(apply, GetCasterGUID(), GetId());
     m_target->SetControlled(apply, UNIT_STAT_CONFUSED);
 }
 
@@ -3871,7 +3870,6 @@ void Aura::HandleModFear(bool apply, bool Real)
     if (!Real)
         return;
 
-    //m_target->SetFeared(apply, GetCasterGUID(), GetId());
     m_target->SetControlled(apply, UNIT_STAT_FLEEING);
 }
 

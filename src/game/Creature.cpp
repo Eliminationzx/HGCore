@@ -251,7 +251,7 @@ void Creature::RemoveCorpse()
     float x,y,z,o;
     GetRespawnCoord(x, y, z, &o);
     SetHomePosition(x,y,z,o);
-    GetMap()->CreatureRelocation(this,x,y,z,o);
+    Relocate(x,y,z,o);
 }
 
 /**
@@ -422,14 +422,6 @@ bool Creature::UpdateEntry(uint32 Entry, uint32 team, const CreatureData *data)
 
 void Creature::Update(uint32 update_diff, uint32 diff)
 {
-    if (IsInWater())
-    {
-        if (CanSwim())
-            AddUnitMovementFlag(MOVEFLAG_SWIMMING);
-    }
-    else if (CanWalk())
-        RemoveUnitMovementFlag(MOVEFLAG_SWIMMING);
-
     switch (m_deathState)
     {
         case JUST_ALIVED:
@@ -1719,10 +1711,8 @@ void Creature::setDeathState(DeathState s)
         //Dismiss group if is leader
         if (m_formation && m_formation->getLeader() == this)
             m_formation->FormationReset(true);
-
-        //if ((CanFly() || IsFlying()))
-        //    i_motionMaster.MoveFall();
     }
+
     Unit::setDeathState(s);
 
     if (s == JUST_DIED)
@@ -1736,18 +1726,20 @@ void Creature::setDeathState(DeathState s)
             if (LootTemplates_Skinning.HaveLootfor (GetCreatureInfo()->SkinLootId))
                 SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_SKINNABLE);
 
-//        if (CanFly() && FallGround())
+        if (CanFly())
+            i_motionMaster.MoveFall();
 
         Unit::setDeathState(CORPSE);
     }
+
     if (s == JUST_ALIVED)
     {
-        //if(isPet())
-        //    setActive(true);
         SetHealth(GetMaxHealth());
         SetLootRecipient(NULL);
         ResetPlayerDamageReq();
+
         Unit::setDeathState(ALIVE);
+
         CreatureInfo const *cinfo = GetCreatureInfo();
         RemoveFlag (UNIT_FIELD_FLAGS, UNIT_FLAG_SKINNABLE);
 
@@ -1987,7 +1979,7 @@ void Creature::DoFleeToGetAssistance()
     if (!getVictim())
         return;
 
-    if (HasAuraType(SPELL_AURA_PREVENTS_FLEEING))
+    if (HasAuraType(SPELL_AURA_PREVENTS_FLEEING) || hasUnitState(UNIT_STAT_NOT_MOVE))
         return;
 
     float radius = sWorld.getConfig(CONFIG_CREATURE_FAMILY_FLEE_ASSISTANCE_RADIUS);
@@ -2332,11 +2324,11 @@ float Creature::GetBaseSpeed() const
 
 bool Creature::HasSpell(uint32 spellID) const
 {
-    uint8 i;
-    for (i = 0; i < CREATURE_MAX_SPELLS; ++i)
+    for (uint8 i = 0; i < CREATURE_MAX_SPELLS; ++i)
         if (spellID == m_spells[i])
-            break;
-    return i < CREATURE_MAX_SPELLS;                         //broke before end of iteration of known spells
+            return true;
+
+    return false;
 }
 
 time_t Creature::GetRespawnTimeEx() const

@@ -3,7 +3,10 @@ file(GLOB_RECURSE game_SRCS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.cpp *.h)
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${CMAKE_SOURCE_DIR}/dep/g3dlite/include
+  ${CMAKE_SOURCE_DIR}/dep/recastnavigation/Detour
+  ${CMAKE_SOURCE_DIR}/dep/recastnavigation/
   ${CMAKE_CURRENT_SOURCE_DIR}/vmap
+  ${CMAKE_CURRENT_SOURCE_DIR}/movemap
   ${CMAKE_SOURCE_DIR}/dep/include
   ${CMAKE_SOURCE_DIR}/src/shared
   ${CMAKE_SOURCE_DIR}/src/shared/Database
@@ -24,7 +27,7 @@ source_group("World/Handlers"
 )
 
 source_group("Motion generators"
-  REGULAR_EXPRESSION Movement|Holder|Motion
+  REGULAR_EXPRESSION MoveMap|MoveMapSharedDefines|Generator|MotionMaster|Holder
 )
 
 source_group("Movement"
@@ -61,6 +64,7 @@ add_library(game STATIC
 target_link_libraries(game
   shared
   g3dlib
+  detour
 )
 
 if(UNIX)

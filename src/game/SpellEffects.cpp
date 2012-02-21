@@ -317,7 +317,7 @@ void Spell::SpellDamageSchoolDmg(uint32 effect_idx)
                 //Gore
                 if (m_spellInfo->SpellIconID == 2269)
                 {
-                  damage+= (uint32)unitTarget->GetMap()->rand32()%2 ? damage : 0;
+                     damage += rand32()%2 ? damage : 0;
                 }
 
                 if (m_spellInfo->Id == 37841)
@@ -645,7 +645,7 @@ void Spell::SpellDamageSchoolDmg(uint32 effect_idx)
                 // Steady Shot
                 else if (m_spellInfo->SpellFamilyFlags & 0x100000000LL)
                 {
-                    int32 base = m_caster->GetMap()->irand((int32)m_caster->GetWeaponDamageRange(RANGED_ATTACK, MINDAMAGE),(int32)m_caster->GetWeaponDamageRange(RANGED_ATTACK, MAXDAMAGE));
+                    int32 base = irand((int32)m_caster->GetWeaponDamageRange(RANGED_ATTACK, MINDAMAGE),(int32)m_caster->GetWeaponDamageRange(RANGED_ATTACK, MAXDAMAGE));
                     damage += int32(float(base)/m_caster->GetAttackTime(RANGED_ATTACK)*2800);
                     rangedAttackPowerCoefficient += 0.2f;
 
@@ -808,12 +808,13 @@ void Spell::EffectDummy(uint32 i)
                 case 41082:
                 {
                     m_caster->CastSpell(unitTarget, 41083, true);
+                    m_caster->CastSpell(unitTarget, 39123, true);
 
                     float x, y, z;
                     unitTarget->GetClosePoint(x,y,z, 0.0f, 0.0f, unitTarget->GetAngle(m_caster));
-                    m_caster->GetMotionMaster()->MovePoint(666, x, y, z);
 
-                    m_caster->CastSpell(unitTarget, 39123, true);
+                    m_caster->GetMotionMaster()->Clear(false, true);
+                    m_caster->GetMotionMaster()->MovePoint(666, x, y, z);
                     break;
                 }
                 case 37573:
@@ -914,7 +915,7 @@ void Spell::EffectDummy(uint32 i)
                 {
                     int32 spell_id = 0;
                     if (rand()%4)
-                        switch (m_caster->GetMap()->urand(1,3))
+                        switch (urand(1,3))
                         {
                             case 1: spell_id = 45297; break;     // Chain Lightning
                             case 2: spell_id = 23102; break;     // Frostbolt!
@@ -1007,7 +1008,7 @@ void Spell::EffectDummy(uint32 i)
                         return;
 
                     uint32 spell_id = 0;
-                    switch (m_caster->GetMap()->urand(1,5))
+                    switch (urand(1,5))
                     {
                         case 1: spell_id = 8064; break;     // Sleepy
                         case 2: spell_id = 8065; break;     // Invigorate
@@ -1024,7 +1025,7 @@ void Spell::EffectDummy(uint32 i)
                         return;
 
                     uint32 spell_id = 0;
-                    switch (m_caster->GetMap()->urand(1,2))
+                    switch (urand(1,2))
                     {
                         // Flip Out - ninja
                         case 1: spell_id = (m_caster->getGender() == GENDER_MALE ? 8219 : 8220); break;
@@ -1125,7 +1126,7 @@ void Spell::EffectDummy(uint32 i)
 
                     uint32 spell_id = 0;
 
-                    uint32 roll = m_caster->GetMap()->urand(0, 99);
+                    uint32 roll = urand(0, 99);
 
                     if (roll < 2)                            // 2% for 30 sec self root (off-like chance unknown)
                         spell_id = 16566;
@@ -1207,7 +1208,7 @@ void Spell::EffectDummy(uint32 i)
                         return;
 
                     uint32 spell_id = 0;
-                    switch (m_caster->GetMap()->urand(1,3))
+                    switch (urand(1,3))
                     {
                         case 1: spell_id = 16595; break;
                         case 2: spell_id = 16593; break;
@@ -1294,7 +1295,7 @@ void Spell::EffectDummy(uint32 i)
                     return;
                 case 23448:                                 // Ultrasafe Transporter: Gadgetzan - backfires
                 {
-                  int32 r = m_caster->GetMap()->irand(0, 119);
+                  int32 r = irand(0, 119);
                     if (r < 20)                           // 1/6 polymorph
                         m_caster->CastSpell(m_caster,23444,true);
                     else if (r < 100)                     // 4/6 evil twin
@@ -1320,7 +1321,7 @@ void Spell::EffectDummy(uint32 i)
                     if (m_caster->GetTypeId()!=TYPEID_PLAYER)
                         return;
 
-                    switch (m_caster->GetMap()->irand(0,3))
+                    switch (irand(0,3))
                     {
                     case 0:
                         m_caster->CastSpell(m_caster,24927,true); // Ghost
@@ -1374,7 +1375,7 @@ void Spell::EffectDummy(uint32 i)
                 {
                     if (unitTarget && unitTarget->GetTypeId() == TYPEID_PLAYER)
                     {
-                        m_caster->ToPlayer()->RewardDNDQuest(9378);
+                        unitTarget->ToPlayer()->RewardDNDQuest(9378);
                         m_caster->CastSpell(unitTarget,29294,true);
                     }
                     return;
@@ -1436,7 +1437,7 @@ void Spell::EffectDummy(uint32 i)
 
                     uint32 spell_id = 0;
 
-                    switch (m_caster->GetMap()->urand(1,5))
+                    switch (urand(1,5))
                     {
                         case 1: spell_id = 33053; break;
                         case 2: spell_id = 33057; break;
@@ -1482,7 +1483,7 @@ void Spell::EffectDummy(uint32 i)
                 {
                     // selecting one from Bloodstained Fortune item
                     uint32 newitemid;
-                    switch (m_caster->GetMap()->urand(1,20))
+                    switch (urand(1,20))
                     {
                         case 1:  newitemid = 32688; break;
                         case 2:  newitemid = 32689; break;
@@ -1769,7 +1770,7 @@ void Spell::EffectDummy(uint32 i)
                     {
                         //Polymorph Cast Visual Rank 1
                         const uint32 spell_list[6] = {32813, 32816, 32817, 32818, 32819, 32820};
-                        unitTarget->CastSpell(unitTarget, spell_list[m_caster->GetMap()->urand(0, 5)], true);
+                        unitTarget->CastSpell(unitTarget, spell_list[urand(0, 5)], true);
                     }
                     return;
                 }
@@ -2730,7 +2731,8 @@ void Spell::EffectTeleportUnits(uint32 i)
 
     float x = m_targets.m_destX;
     float y = m_targets.m_destY;
-    float z = m_targets.m_destZ +0.5f;
+    float z = m_targets.m_destZ;
+
     float orientation = m_targets.getUnitTarget() ? m_targets.getUnitTarget()->GetOrientation() : unitTarget->GetOrientation();
     sLog.outDebug("Spell::EffectTeleportUnits - teleport unit to %u %f %f %f\n", mapid, x, y, z);
     // Teleport
@@ -2746,7 +2748,7 @@ void Spell::EffectTeleportUnits(uint32 i)
         // Dimensional Ripper - Everlook
         case 23442:
         {
-          int32 r = m_caster->GetMap()->irand(0, 119);
+          int32 r = irand(0, 119);
             if (r >= 70)                                  // 7/12 success
             {
                 if (r < 100)                              // 4/12 evil twin
@@ -2761,7 +2763,7 @@ void Spell::EffectTeleportUnits(uint32 i)
         {
             if (roll_chance_i(50))                        // 50% success
             {
-              int32 rand_eff = m_caster->GetMap()->urand(1,7);
+              int32 rand_eff = urand(1,7);
                 switch (rand_eff)
                 {
                     case 1:
@@ -2806,7 +2808,7 @@ void Spell::EffectTeleportUnits(uint32 i)
         {
             if (roll_chance_i(50))                        // 50% success
             {
-              int32 rand_eff = m_caster->GetMap()->urand(1,4);
+              int32 rand_eff = urand(1,4);
                 switch (rand_eff)
                 {
                     case 1:
@@ -3363,7 +3365,7 @@ void Spell::DoCreateItem(uint32 i, uint32 itemtype)
         /*int32 basePoints = m_currentBasePoints[i];
         int32 randomPoints = m_spellInfo->EffectDieSides[i];
         if (randomPoints)
-            num_to_add = basePoints + m_caster->GetMap()->irand(1, randomPoints);
+            num_to_add = basePoints + irand(1, randomPoints);
         else
             num_to_add = basePoints + 1;*/
     }
@@ -3582,7 +3584,7 @@ void Spell::EffectEnergize(uint32 i)
         if (!elixirs.empty())
         {
             // cast random elixir on target
-            uint32 rand_spell = m_caster->GetMap()->urand(0,elixirs.size()-1);
+            uint32 rand_spell = urand(0,elixirs.size()-1);
             m_caster->CastSpell(unitTarget,elixirs[rand_spell],true,m_CastItem);
         }
     }
@@ -3994,7 +3996,7 @@ void Spell::EffectDispel(uint32 i)
         for (int32 count=0; count < damage && list_size > 0; ++count)
         {
             // Random select buff for dispel
-          Aura *aur = dispel_list[m_caster->GetMap()->urand(0, list_size-1)];
+          Aura *aur = dispel_list[urand(0, list_size-1)];
 
             SpellEntry const* spellInfo = aur->GetSpellProto();
             // Base dispel chance
@@ -4118,7 +4120,6 @@ void Spell::EffectDistract(uint32 /*i*/)
         return;
 
     unitTarget->SetFacingTo(unitTarget->GetAngle(m_targets.m_destX, m_targets.m_destY));
-    unitTarget->clearUnitState(UNIT_STAT_MOVING);
 
     unitTarget->SetStandState(PLAYER_STATE_NONE);
 
@@ -4140,7 +4141,7 @@ void Spell::EffectPickPocket(uint32 /*i*/)
     {
         int32 chance = 10 + int32(m_caster->getLevel()) - int32(unitTarget->getLevel());
 
-        if (chance > m_caster->GetMap()->irand(0, 19))
+        if (chance > irand(0, 19))
         {
             // Stealing successful
             //sLog.outDebug("Sending loot from pickpocket");
@@ -5534,7 +5535,7 @@ void Spell::EffectScriptEffect(uint32 effIndex)
                 return;
 
             uint32 spell_id = 0;
-            switch (m_caster->GetMap()->urand(1,5))
+            switch (urand(1,5))
             {
                 case 1:  spell_id = 8854; break;
                 default: spell_id = 8855; break;
@@ -5704,15 +5705,15 @@ void Spell::EffectScriptEffect(uint32 effIndex)
                 return;
 
             uint32 spellId;
-            switch ((uint32)m_caster->GetMap()->rand32()%7)
+            switch ((uint32)rand32()%7)
             {
-            case 0: spellId = 24717; break; // Pirate Costume
-            case 1: spellId = 24741; break; // Wisp Costume
-            case 2: spellId = 24724; break; // Skeleton Costume
-            case 3: spellId = 24719; break; // Leper Gnome Costume
-            case 4: spellId = 24718; break; // Ninja Costume
-            case 5: spellId = 24737; break; // Ghost Costume
-            case 6: spellId = 24733; break; // Bat Costume
+                case 0: spellId = 24717; break; // Pirate Costume
+                case 1: spellId = 24741; break; // Wisp Costume
+                case 2: spellId = 24724; break; // Skeleton Costume
+                case 3: spellId = 24719; break; // Leper Gnome Costume
+                case 4: spellId = 24718; break; // Ninja Costume
+                case 5: spellId = 24737; break; // Ghost Costume
+                case 6: spellId = 24733; break; // Bat Costume
             }
             m_caster->CastSpell(unitTarget, spellId, true);
         }
@@ -5818,7 +5819,7 @@ void Spell::EffectScriptEffect(uint32 effIndex)
             for (uint8 i=0; i<5; i++)
                 if (unitTarget->HasAura(spellid+i, 0))
                     return;
-            unitTarget->CastSpell(unitTarget, spellid+m_caster->GetMap()->urand(0, 4), true);
+            unitTarget->CastSpell(unitTarget, spellid+urand(0, 4), true);
             break;
         }
 
@@ -6327,6 +6328,9 @@ void Spell::EffectScriptEffect(uint32 effIndex)
         case 45235: // Eredar Twins: Blaze
             unitTarget->CastSpell(unitTarget, 45236, true, NULL, NULL, m_caster->GetGUID());
             break;
+        case 30541: // Magtheridon's Blaze
+            unitTarget->CastSpell(unitTarget, 30542, true, NULL, NULL, m_caster->GetGUID());
+            break;
     }
 
     if (m_spellInfo->SpellFamilyName == SPELLFAMILY_PALADIN)
@@ -6524,39 +6528,36 @@ void Spell::EffectDuel(uint32 i)
 
 void Spell::EffectStuck(uint32 /*i*/)
 {
-    if (!unitTarget || unitTarget->GetTypeId() != TYPEID_PLAYER)
+    if (!unitTarget)
         return;
 
-    if (!sWorld.getConfig(CONFIG_CAST_UNSTUCK))
+    Player* pTarget = unitTarget->ToPlayer();
+
+    if (!pTarget || !sWorld.getConfig(CONFIG_CAST_UNSTUCK))
         return;
 
-    Player* pTarget = (Player*)unitTarget;
-
-    sLog.outDebug("Spell Effect: Stuck");
     sLog.outDetail("Player %s (guid %u) used auto-unstuck future at map %u (%f, %f, %f)", pTarget->GetName(), pTarget->GetGUIDLow(), m_caster->GetMapId(), m_caster->GetPositionX(), pTarget->GetPositionY(), pTarget->GetPositionZ());
 
-    if (pTarget->IsTaxiFlying())
+    // player stucked on arena or bg just should leave ;]
+    if (pTarget->IsTaxiFlying() || pTarget->InArenaOrBG())
         return;
 
-    // if player hasn't cooldown on HearthStone then use him
-    // otherwise teleport to player start location
-    if (!pTarget->GetSpellCooldownDelay(8690))
+    // if player isn't alive repop him on nearest graveyard (for stucking while in ghost)
+    if (pTarget->isAlive())
     {
-        // homebind location is loaded always
-        pTarget->TeleportToHomebind(unitTarget == m_caster ? TELE_TO_SPELL : 0);
-
-        // Stuck spell trigger Hearthstone cooldown
-        SpellEntry const *spellInfo = sSpellStore.LookupEntry(8690);
-        if (!spellInfo)
-            return;
-        Spell spell(pTarget,spellInfo,true,0);
-        spell.SendSpellCooldown();
+        // if player hasn't cooldown on HearthStone and have in bags then use him
+        // otherwise teleport to player start location
+        if (!pTarget->GetSpellCooldownDelay(8690) && pTarget->HasItemCount(6948, 1))
+            pTarget->CastSpell(pTarget, 8690, true);
+        else
+            if (PlayerInfo const * tmpPlInfo = objmgr.GetPlayerInfo(pTarget->getRace(), pTarget->getClass()))
+                pTarget->TeleportTo(tmpPlInfo->mapId, tmpPlInfo->positionX, tmpPlInfo->positionY, tmpPlInfo->positionZ, 0.0f);
     }
     else
     {
-        PlayerInfo const * tmpPlInfo = objmgr.GetPlayerInfo(pTarget->getRace(), pTarget->getClass());
-        if (tmpPlInfo)
-            pTarget->TeleportTo(tmpPlInfo->mapId, tmpPlInfo->positionX, tmpPlInfo->positionY, tmpPlInfo->positionZ, 0.0f);
+        if (!pTarget->GetCorpse())
+            pTarget->BuildPlayerRepop();
+        pTarget->TeleportToNearestGraveyard();
     }
 }
 
@@ -7065,12 +7066,16 @@ void Spell::EffectCharge(uint32 /*i*/)
     if (!target)
         return;
 
-    float x, y, z;
-    target->GetContactPoint(m_caster, x, y, z);
+
     if (m_caster->GetTypeId() == TYPEID_PLAYER)
         ((Player *)m_caster)->m_AC_timer = 3000;
 
-    m_caster->GetMotionMaster()->MoveCharge(x, y, z + 0.1f);
+    Position dest;
+    target->GetPosition(dest);
+
+    float angle = m_caster->GetAngle(target) - m_caster->GetOrientation() - M_PI;
+    m_caster->GetValidPointInAngle(dest, 2.0f, angle, false);
+    m_caster->GetMotionMaster()->MoveCharge(dest.x, dest.y, dest.z);
 
     // not all charge effects used in negative spells
     if (!IsPositiveSpell(m_spellInfo->Id) && m_caster->GetTypeId() == TYPEID_PLAYER)
@@ -7087,7 +7092,7 @@ void Spell::EffectCharge2(uint32 /*i*/)
         z = m_targets.m_destZ;
 
         if (unitTarget && unitTarget->GetTypeId() != TYPEID_PLAYER)
-            ((Creature *)unitTarget)->StopMoving();
+            unitTarget->GetMotionMaster()->StopMovement();
     }
     else if (unitTarget && unitTarget != m_caster)
         unitTarget->GetContactPoint(m_caster, x, y, z, 3.666666f);
@@ -7479,7 +7484,7 @@ void Spell::EffectTransmitted(uint32 effIndex)
     {
         float min_dis = GetSpellMinRange(sSpellRangeStore.LookupEntry(m_spellInfo->rangeIndex));
         float max_dis = GetSpellMaxRange(sSpellRangeStore.LookupEntry(m_spellInfo->rangeIndex));
-        float dis = m_caster->GetMap()->rand_norm() * (max_dis - min_dis) + min_dis;
+        float dis = rand_norm() * (max_dis - min_dis) + min_dis;
 
         m_caster->GetClosePoint(fx,fy,fz,DEFAULT_WORLD_OBJECT_SIZE, dis);
     }
@@ -7535,7 +7540,7 @@ void Spell::EffectTransmitted(uint32 effIndex)
             // end time of range when possible catch fish (FISHING_BOBBER_READY_TIME..GetDuration(m_spellInfo))
             // start time == fish-FISHING_BOBBER_READY_TIME (0..GetDuration(m_spellInfo)-FISHING_BOBBER_READY_TIME)
             int32 lastSec = 0;
-            switch (m_caster->GetMap()->urand(0, 3))
+            switch (urand(0, 3))
             {
                 case 0: lastSec =  3; break;
                 case 1: lastSec =  7; break;
@@ -7552,6 +7557,7 @@ void Spell::EffectTransmitted(uint32 effIndex)
             {
                 pGameObj->AddUniqueUse((Player*)m_caster);
                 m_caster->AddGameObject(pGameObj);          // will removed at spell cancel
+                pGameObj->SetTarget(((Player*)m_caster)->GetSelection());
             }
             break;
         }
@@ -7740,7 +7746,7 @@ void Spell::EffectStealBeneficialBuff(uint32 i)
         for (int32 count=0; count < damage && list_size > 0; ++count)
         {
             // Random select buff for dispel
-            Aura *aur = steal_list[m_caster->GetMap()->urand(0, list_size-1)];
+            Aura *aur = steal_list[urand(0, list_size-1)];
 
             // Base dispel chance
             // TODO: possible chance depend from spell level??

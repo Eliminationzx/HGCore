@@ -22,7 +22,7 @@
 #include "MovementGenerator.h"
 #include "FollowerReference.h"
 #include "Timer.h"
-
+#include "PathFinder.h"
 #include "Unit.h"
 
 class TargetedMovementGeneratorBase
@@ -42,13 +42,19 @@ class TargetedMovementGeneratorMedium
     protected:
         TargetedMovementGeneratorMedium(Unit &target, float offset, float angle) :
             TargetedMovementGeneratorBase(target), i_offset(offset), i_angle(angle),
-            i_recalculateTravel(false), i_targetReached(false), i_recheckDistance(0)
+            i_recalculateTravel(false), i_targetReached(false), i_recheckDistance(0),
+            i_path(NULL)
         {
         }
-        ~TargetedMovementGeneratorMedium() {}
+        ~TargetedMovementGeneratorMedium() { delete i_path; }
 
     public:
         bool Update(T &, const uint32 &);
+
+        bool IsReachable() const
+        {
+            return (i_path) ? (i_path->getPathType() & PATHFIND_NORMAL) : true;
+        }
 
         Unit* GetTarget() const { return i_target.getTarget(); }
 
@@ -63,6 +69,8 @@ class TargetedMovementGeneratorMedium
         float i_angle;
         bool i_recalculateTravel : 1;
         bool i_targetReached : 1;
+
+        PathFinder* i_path;
 };
 
 template<class T>
@@ -82,8 +90,6 @@ class ChaseMovementGenerator : public TargetedMovementGeneratorMedium<T, ChaseMo
         void Interrupt(T &);
         void Reset(T &);
 
-        static void _clearUnitStateMove(T &u) { u.clearUnitState(UNIT_STAT_CHASE_MOVE); }
-        static void _addUnitStateMove(T &u)  { u.addUnitState(UNIT_STAT_CHASE_MOVE); }
         bool EnableWalking(T &) const;
         bool _lostTarget(T &u) const { return u.getVictim() != this->GetTarget(); }
         void _reachTarget(T &);
@@ -106,8 +112,6 @@ class FollowMovementGenerator : public TargetedMovementGeneratorMedium<T, Follow
         void Interrupt(T &);
         void Reset(T &);
 
-        static void _clearUnitStateMove(T &u) { u.clearUnitState(UNIT_STAT_FOLLOW_MOVE); }
-        static void _addUnitStateMove(T &u)  { u.addUnitState(UNIT_STAT_FOLLOW_MOVE); }
         bool EnableWalking(T &) const;
         bool _lostTarget(T &) const { return false; }
         void _reachTarget(T &) {}

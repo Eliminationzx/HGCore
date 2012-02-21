@@ -187,7 +187,7 @@ void ScriptedAI::DoStartNoMovement(Unit* pVictim, movementCheckType type)
 
 void ScriptedAI::CheckCasterNoMovementInRange(uint32 diff, float maxrange)
 {
-    if(!UpdateVictim())
+    if(!UpdateVictim() || !me->getVictim())
         return;
 
     if(!me->IsInMap(me->getVictim()))
@@ -225,7 +225,7 @@ void ScriptedAI::CheckCasterNoMovementInRange(uint32 diff, float maxrange)
 
 void ScriptedAI::CheckShooterNoMovementInRange(uint32 diff, float maxrange)
 {
-    if(!UpdateVictim())
+    if(!UpdateVictim() || !me->getVictim())
         return;
 
     if(!me->IsInMap(me->getVictim()))
@@ -451,7 +451,7 @@ void ScriptedAI::DoCastSpell(Unit* who,SpellEntry const *spellInfo, bool trigger
     if (/*!who || */m_creature->IsNonMeleeSpellCasted(false))
         return;
 
-    m_creature->StopMoving();
+    //m_creature->GetMotionMaster()->StopMovement();
     m_creature->CastSpell(who, spellInfo, triggered);
 }
 

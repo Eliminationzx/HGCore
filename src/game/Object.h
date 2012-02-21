@@ -94,6 +94,8 @@ struct Position
 {
     Position() : x(0.0f), y(0.0f), z(0.0f), o(0.0f) {}
     float x, y, z, o;
+
+    bool operator!=(Position &b) { return (x != b.x || y != b.y || z != b.z); }
 };
 
 struct WorldLocation
@@ -455,7 +457,7 @@ class TRINITY_DLL_SPEC WorldObject : public Object//, public WorldLocation
         void UpdateAllowedPositionZ(float x, float y, float &z) const;
 
         void GetRandomPoint(float x, float y, float z, float distance, float &rand_x, float &rand_y, float &rand_z) const;
-        void GetValidPointInAngle(Position &pos, float dist, float angle, bool meAsSourcePo);
+        void GetValidPointInAngle(Position &pos, float dist, float angle, bool meAsSourcePo, bool ignoreLOSOffset = false);
 
         void SetMapId(uint32 newMap) { m_mapId = newMap; m_map = NULL; }
         uint32 GetMapId() const { return m_mapId; }
@@ -503,6 +505,9 @@ class TRINITY_DLL_SPEC WorldObject : public Object//, public WorldLocation
             return IsInWorld() && obj->IsInWorld() && GetMapId()==obj->GetMapId() &&
                 GetInstanceId()==obj->GetInstanceId();
         }
+
+        bool IsWithinDist2d(float x, float y, float dist2compare) const;
+        bool IsWithinDist3d(float x, float y, float z, float dist2compare) const;
 
         bool _IsWithinDist(WorldObject const* obj, float dist2compare, bool is3D) const;
         bool _IsWithinDist(WorldLocation const* wLoc, float dist2compare, bool is3D) const;

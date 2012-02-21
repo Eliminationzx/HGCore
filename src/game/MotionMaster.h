@@ -118,8 +118,8 @@ class TRINITY_DLL_SPEC MotionMaster : private std::stack<MovementGenerator *>
         void MoveChase(Unit* target, float dist = 0.0f, float angle = 0.0f);
         void MoveConfused();
         void MoveFleeing(Unit* enemy, uint32 time = 0);
-        void MovePoint(uint32 id, float x,float y,float z);
-        void MoveCharge(float x, float y, float z, float speed = SPEED_CHARGE, uint32 id = EVENT_CHARGE);
+        void MovePoint(uint32 id, float x,float y,float z, bool generatePath = false);
+        void MoveCharge(float x, float y, float z, float speed = SPEED_CHARGE, uint32 id = EVENT_CHARGE, bool generatePath = false);
         void MoveSeekAssistance(float x,float y,float z);
         void MoveSeekAssistanceDistract(uint32 timer);
         void MoveTaxiFlight(uint32 path, uint32 pathnode);
@@ -136,6 +136,8 @@ class TRINITY_DLL_SPEC MotionMaster : private std::stack<MovementGenerator *>
         void UpdateFinalDistanceToTarget(float fDistance);
 
         bool GetDestination(float &x, float &y, float &z);
+
+        void StopMovement(uint32 time = 3 * MINUTE * IN_MILISECONDS);
 
     private:
         void Mutate(MovementGenerator *m);                  // use Move* functions instead

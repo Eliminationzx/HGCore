@@ -112,6 +112,13 @@ void MotionMaster::UpdateMotion(uint32 diff)
     }
 }
 
+void MotionMaster::StopMovement(uint32 time /*= 3 * MINUTE * IN_MILLISECONDS*/)
+{
+    m_owner->DisableSpline();
+    m_owner->StopMoving();
+    top()->StopMovement(time);
+}
+
 void MotionMaster::DirectClean(bool reset, bool all)
 {
     while (all ? !empty() : size() > 1)
@@ -293,20 +300,21 @@ void MotionMaster::MoveFollow(Unit* target, float dist, float angle)
         Mutate(new FollowMovementGenerator<Creature>(*target,dist,angle));
 }
 
-void MotionMaster::MovePoint(uint32 id, float x, float y, float z)
+void MotionMaster::MovePoint(uint32 id, float x, float y, float z, bool generatePath)
 {
     if (m_owner->GetTypeId() == TYPEID_PLAYER)
-        Mutate(new PointMovementGenerator<Player>(id,x,y,z));
+        Mutate(new PointMovementGenerator<Player>(id,x,y,z,generatePath));
     else
-        Mutate(new PointMovementGenerator<Creature>(id,x,y,z));
+        Mutate(new PointMovementGenerator<Creature>(id,x,y,z,generatePath));
 }
 
-void MotionMaster::MoveCharge(float x, float y, float z, float speed, uint32 id)
+void MotionMaster::MoveCharge(float x, float y, float z, float speed, uint32 id, bool generatePath)
 {
-    if (m_owner->GetTypeId() == TYPEID_PLAYER)
-        Mutate(new PointMovementGenerator<Player>(id,x,y,z,speed));
-    else
-        Mutate(new PointMovementGenerator<Creature>(id,x,y,z,speed));
+    Movement::MoveSplineInit init(*m_owner);
+    init.MoveTo(x, y, z);
+    init.SetVelocity(speed);
+    init.Launch();
+    Mutate(new EffectMovementGenerator(id));
 }
 
 void MotionMaster::MoveSeekAssistance(float x, float y, float z)
@@ -398,6 +406,7 @@ void MotionMaster::Mutate(MovementGenerator *m)
             // HomeMovement is not that important, delete it if meanwhile a new comes
             case HOME_MOTION_TYPE:
             // DistractMovement interrupted by any other movement
+            case EFFECT_MOTION_TYPE:
             case DISTRACT_MOTION_TYPE:
                 MovementExpired(false);
             default:

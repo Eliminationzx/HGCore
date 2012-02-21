@@ -36,9 +36,9 @@ void PointMovementGenerator<T>::Initialize(T &unit)
     if (!unit.IsStopped())
         unit.StopMoving();
 
-    unit.addUnitState(UNIT_STAT_ROAMING|UNIT_STAT_ROAMING_MOVE);
+    unit.addUnitState(UNIT_STAT_ROAMING);
     Movement::MoveSplineInit init(unit);
-    init.MoveTo(i_x, i_y, i_z);
+    init.MoveTo(i_x, i_y, i_z, m_generatePath);
     if (speed > 0.0f)
         init.SetVelocity(speed);
 
@@ -48,7 +48,7 @@ void PointMovementGenerator<T>::Initialize(T &unit)
 template<class T>
 void PointMovementGenerator<T>::Interrupt(T &unit)
 {
-    unit.clearUnitState(UNIT_STAT_ROAMING|UNIT_STAT_ROAMING_MOVE);
+    unit.clearUnitState(UNIT_STAT_ROAMING);
 }
 
 template<class T>
@@ -57,42 +57,53 @@ void PointMovementGenerator<T>::Reset(T &unit)
     if (!unit.IsStopped())
         unit.StopMoving();
 
-    unit.addUnitState(UNIT_STAT_ROAMING|UNIT_STAT_ROAMING_MOVE);
+    unit.addUnitState(UNIT_STAT_ROAMING);
 }
 
 template<class T>
 bool PointMovementGenerator<T>::Update(T &unit, const uint32 &diff)
 {
-    if (!&unit)
-        return false;
-
-    if (unit.hasUnitState(UNIT_STAT_CAN_NOT_MOVE))
+    if (!_arrived && unit.IsWithinDist3d(i_x, i_y, i_z, 0.05f))
     {
-        unit.clearUnitState(UNIT_STAT_ROAMING_MOVE);
+        MovementInform(unit);
         return true;
     }
 
-    unit.addUnitState(UNIT_STAT_ROAMING_MOVE);
+    if (unit.hasUnitState(UNIT_STAT_CAN_NOT_MOVE))
+    {
+        if (!unit.IsStopped())
+        {
+            unit.DisableSpline();
+            unit.StopMoving();
+        }
+        return true;
+    }
+    else if (unit.IsStopped() && !_arrived)
+    {
+        Initialize(unit);
+        return true;
+    }
+
     return !unit.movespline->Finalized();
 }
 
 template<class T>
 void PointMovementGenerator<T>::Finalize(T &unit)
 {
-    unit.clearUnitState(UNIT_STAT_ROAMING|UNIT_STAT_ROAMING_MOVE);
-
-    if (unit.movespline->Finalized())
-        MovementInform(unit);
+    unit.clearUnitState(UNIT_STAT_ROAMING);
 }
 
 template<>
 void PointMovementGenerator<Player>::MovementInform(Player&)
 {
+    _arrived = true;
 }
 
 template <>
 void PointMovementGenerator<Creature>::MovementInform(Creature &unit)
 {
+    _arrived = true;
+
     if (unit.AI())
         unit.AI()->MovementInform(POINT_MOTION_TYPE, id);
 
@@ -141,7 +152,7 @@ void EffectMovementGenerator::Finalize(Unit &unit)
     if (unit.isAlive() && !unit.hasUnitState(UNIT_STAT_CONFUSED|UNIT_STAT_FLEEING))
     {
         if (Unit * victim = unit.getVictim())
-            unit.ToCreature()->AI()->AttackStart(victim);
+            unit.GetMotionMaster()->MoveChase(victim);
         else
             unit.GetMotionMaster()->Initialize();
     }

@@ -1106,6 +1106,31 @@ float WorldObject::GetDistanceZ(const WorldObject* obj) const
     return (dist > 0 ? dist : 0);
 }
 
+bool WorldObject::IsWithinDist3d(float x, float y, float z, float dist2compare) const
+{
+    float dx = GetPositionX() - x;
+    float dy = GetPositionY() - y;
+    float dz = GetPositionZ() - z;
+    float distsq = dx*dx + dy*dy + dz*dz;
+
+    float sizefactor = GetObjectBoundingRadius();
+    float maxdist = dist2compare + sizefactor;
+
+    return distsq < maxdist * maxdist;
+}
+
+bool WorldObject::IsWithinDist2d(float x, float y, float dist2compare) const
+{
+    float dx = GetPositionX() - x;
+    float dy = GetPositionY() - y;
+    float distsq = dx*dx + dy*dy;
+
+    float sizefactor = GetObjectBoundingRadius();
+    float maxdist = dist2compare + sizefactor;
+
+    return distsq < maxdist * maxdist;
+}
+
 bool WorldObject::_IsWithinDist(WorldObject const* obj, float dist2compare, bool is3D) const
 {
     float dx = GetPositionX() - obj->GetPositionX();
@@ -1283,7 +1308,7 @@ void WorldObject::GetRandomPoint(float x, float y, float z, float distance, floa
 }
 
 // this will find point in LOS before collision occur
-void WorldObject::GetValidPointInAngle(Position &pos, float dist, float angle, bool meAsSourcePos)
+void WorldObject::GetValidPointInAngle(Position &pos, float dist, float angle, bool meAsSourcePos, bool ignoreLOSOffset)
 {
     angle += GetOrientation();
 
@@ -1298,29 +1323,34 @@ void WorldObject::GetValidPointInAngle(Position &pos, float dist, float angle, b
     float ground = _map->GetHeight(dest.x, dest.y, MAX_HEIGHT, true);
     float floor = _map->GetHeight(dest.x, dest.y, pos.z, true);
 
-    dest.z = fabs(ground - pos.z) <= fabs(floor - pos.z) ? ground : floor;
+    dest.z = 1.0f +fabs(ground - pos.z) <= fabs(floor - pos.z) ? ground : floor;
 
     // collision occured
-    if (VMAP::VMapFactory::createOrGetVMapManager()->getObjectHitPos(GetMapId(),pos.x, pos.y, pos.z+0.5f, dest.x, dest.y, dest.z+0.5f, dest.x, dest.y, dest.z, -0.5f))
+    bool result = false;
+    if (ignoreLOSOffset)
+        result = VMAP::VMapFactory::createOrGetVMapManager()->getObjectHitPos(GetMapId(), pos.x, pos.y, pos.z +0.5f, dest.x, dest.y, dest.z +0.5f, dest.x, dest.y, dest.z, -1.5f);
+    else
+        result = VMAP::VMapFactory::createOrGetVMapManager()->getObjectHitPos(GetMapId(), pos.x, pos.y, pos.z +3.0f, dest.x, dest.y, dest.z +7.0f, dest.x, dest.y, dest.z, -0.5f);
+
+    if (result)
     {
         // move back a bit
-        dest.x -= CONTACT_DISTANCE * cos(angle);
-        dest.y -= CONTACT_DISTANCE * sin(angle);
+        dest.x -= 1.0f * cos(angle);
+        dest.y -= 1.0f * sin(angle);
         dist = sqrt((pos.x - dest.x)*(pos.x - dest.x) + (pos.y - dest.y)*(pos.y - dest.y));
     }
 
     float step = dist / 10.0f;
-
     for (int j = 0; j < 10; ++j)
     {
         // do not allow too big z changes
-        if (fabs(pos.z - dest.z) > 6)
+        if (fabs(pos.z - dest.z) > 5.0f)
         {
             dest.x -= step * cos(angle);
             dest.y -= step * sin(angle);
             ground = _map->GetHeight(dest.x, dest.y, MAX_HEIGHT, true);
-            floor = _map->GetHeight(dest.x, dest.y, pos.z, true);
-            dest.z = fabs(ground - pos.z) <= fabs(floor - pos.z) ? ground : floor;
+            floor = _map->GetHeight(dest.x, dest.y, pos.z +2.0f, true);
+            dest.z = 1.0f +fabs(ground - pos.z) <= fabs(floor - pos.z) ? ground : floor;
         }
         // we have correct destz now
         else
@@ -1332,14 +1362,18 @@ void WorldObject::GetValidPointInAngle(Position &pos, float dist, float angle, b
 
     Trinity::NormalizeMapCoord(pos.x);
     Trinity::NormalizeMapCoord(pos.y);
-    UpdateGroundPositionZ(pos.x, pos.y, pos.z);
+    pos.z = 0.666f + GetTerrain()->GetHeight(pos.x, pos.y, pos.z +2.0f, true);
+
+    // we do NOT love micromovement :p
+    if (IsInRange2d(pos.x, pos.y, 0.0f, 1.5f))
+        GetPosition(pos);
 }
 
 void WorldObject::UpdateGroundPositionZ(float x, float y, float &z) const
 {
     float new_z = GetTerrain()->GetHeight(x,y,z,true);
     if (new_z > INVALID_HEIGHT)
-        z = new_z + 0.05f;                                  // just to be sure that we are not a few pixel under the surface
+        z = new_z + 0.06f;                                  // just to be sure that we are not a few pixel under the surface
 }
 
 void WorldObject::UpdateAllowedPositionZ(float x, float y, float &z) const

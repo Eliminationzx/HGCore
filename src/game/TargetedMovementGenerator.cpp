@@ -82,13 +82,20 @@ void TargetedMovementGeneratorMedium<T,D>::_setTargetLocation(T &owner)
             return;
     */
 
+    if (!i_path)
+        i_path = new PathFinder(&owner);
 
-    D::_addUnitStateMove(owner);
+    // allow pets following their master to cheat while generating paths
+    bool forceDest = (owner.GetTypeId() == TYPEID_UNIT && ((Creature*)&owner)->isPet() && owner.hasUnitState(UNIT_STAT_FOLLOW));
+    i_path->calculate(x, y, z, forceDest);
+    if (i_path->getPathType() & PATHFIND_NOPATH)
+        return;
+
     i_targetReached = false;
     i_recalculateTravel = false;
 
     Movement::MoveSplineInit init(owner);
-    init.MoveTo(x,y,z);
+    init.MovebyPath(i_path->getPath());
     init.SetWalk(((D*)this)->EnableWalking(owner));
     init.Launch();
 }
@@ -129,10 +136,7 @@ bool TargetedMovementGeneratorMedium<T,D>::Update(T &owner, const uint32 & time_
         return true;
 
     if (owner.hasUnitState(UNIT_STAT_NOT_MOVE))
-    {
-        D::_clearUnitStateMove(owner);
         return true;
-    }
 
     if (owner.hasUnitState(UNIT_STAT_CASTING_NOT_MOVE))
     {
@@ -144,21 +148,23 @@ bool TargetedMovementGeneratorMedium<T,D>::Update(T &owner, const uint32 & time_
 
     // prevent crash after creature killed pet
     if (static_cast<D*>(this)->_lostTarget(owner))
-    {
-        D::_clearUnitStateMove(owner);
         return true;
-    }
 
     i_recheckDistance.Update(time_diff);
     if (i_recheckDistance.Passed())
     {
-        i_recheckDistance.Reset(50);
-        //More distance let have better performance, less distance let have more sensitive reaction at target move.
-        float allowed_dist = i_target->GetObjectBoundingRadius() + owner.GetObjectBoundingRadius()
-            + sWorld.getConfig(CONFIG_RATE_TARGET_POS_RECALCULATION_RANGE);
-        float dist = (owner.movespline->FinalDestination() -
-            G3D::Vector3(i_target->GetPositionX(),i_target->GetPositionY(),i_target->GetPositionZ())).squaredLength();
-        if (dist >= allowed_dist * allowed_dist)
+        i_recheckDistance.Reset(100);
+
+        float allowed_dist = owner.GetObjectBoundingRadius() + sWorld.getConfig(CONFIG_RATE_TARGET_POS_RECALCULATION_RANGE);
+        G3D::Vector3 dest = owner.movespline->FinalDestination();
+
+        bool targetMoved = false;
+        if (owner.GetTypeId() == TYPEID_UNIT && ((Creature*)&owner)->CanFly())
+            targetMoved = !i_target->IsWithinDist3d(dest.x, dest.y, dest.z, allowed_dist);
+        else
+            targetMoved = !i_target->IsWithinDist2d(dest.x, dest.y, allowed_dist);
+
+        if (targetMoved)
             _setTargetLocation(owner);
     }
 
@@ -192,7 +198,7 @@ void ChaseMovementGenerator<T>::_reachTarget(T &owner)
 template<>
 void ChaseMovementGenerator<Player>::Initialize(Player &owner)
 {
-    owner.addUnitState(UNIT_STAT_CHASE|UNIT_STAT_CHASE_MOVE);
+    owner.addUnitState(UNIT_STAT_CHASE);
     _setTargetLocation(owner);
 }
 
@@ -200,20 +206,20 @@ template<>
 void ChaseMovementGenerator<Creature>::Initialize(Creature &owner)
 {
     owner.SetWalk(false);
-    owner.addUnitState(UNIT_STAT_CHASE|UNIT_STAT_CHASE_MOVE);
+    owner.addUnitState(UNIT_STAT_CHASE);
     _setTargetLocation(owner);
 }
 
 template<class T>
 void ChaseMovementGenerator<T>::Finalize(T &owner)
 {
-    owner.clearUnitState(UNIT_STAT_CHASE|UNIT_STAT_CHASE_MOVE);
+    owner.clearUnitState(UNIT_STAT_CHASE);
 }
 
 template<class T>
 void ChaseMovementGenerator<T>::Interrupt(T &owner)
 {
-    owner.clearUnitState(UNIT_STAT_CHASE|UNIT_STAT_CHASE_MOVE);
+    owner.clearUnitState(UNIT_STAT_CHASE);
 }
 
 template<class T>
@@ -268,7 +274,7 @@ void FollowMovementGenerator<Creature>::_updateSpeed(Creature &u)
 template<>
 void FollowMovementGenerator<Player>::Initialize(Player &owner)
 {
-    owner.addUnitState(UNIT_STAT_FOLLOW|UNIT_STAT_FOLLOW_MOVE);
+    owner.addUnitState(UNIT_STAT_FOLLOW);
     _updateSpeed(owner);
     _setTargetLocation(owner);
 }
@@ -276,7 +282,7 @@ void FollowMovementGenerator<Player>::Initialize(Player &owner)
 template<>
 void FollowMovementGenerator<Creature>::Initialize(Creature &owner)
 {
-    owner.addUnitState(UNIT_STAT_FOLLOW|UNIT_STAT_FOLLOW_MOVE);
+    owner.addUnitState(UNIT_STAT_FOLLOW);
     _updateSpeed(owner);
     _setTargetLocation(owner);
 }
@@ -284,14 +290,14 @@ void FollowMovementGenerator<Creature>::Initialize(Creature &owner)
 template<class T>
 void FollowMovementGenerator<T>::Finalize(T &owner)
 {
-    owner.clearUnitState(UNIT_STAT_FOLLOW|UNIT_STAT_FOLLOW_MOVE);
+    owner.clearUnitState(UNIT_STAT_FOLLOW);
     _updateSpeed(owner);
 }
 
 template<class T>
 void FollowMovementGenerator<T>::Interrupt(T &owner)
 {
-    owner.clearUnitState(UNIT_STAT_FOLLOW|UNIT_STAT_FOLLOW_MOVE);
+    owner.clearUnitState(UNIT_STAT_FOLLOW);
     _updateSpeed(owner);
 }
 

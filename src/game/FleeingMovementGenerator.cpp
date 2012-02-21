@@ -42,8 +42,6 @@ void FleeingMovementGenerator<T>::_setTargetLocation(T &owner)
     if (!_getPoint(owner, x, y, z))
         return;
 
-    owner.addUnitState(UNIT_STAT_FLEEING_MOVE);
-
     Movement::MoveSplineInit init(owner);
     init.MoveTo(x,y,z);
     init.SetWalk(false);
@@ -57,57 +55,41 @@ bool FleeingMovementGenerator<T>::_getPoint(T &owner, float &x, float &y, float 
 {
     Position temp;
 
-    float angle = 0.0f;
-    float distance = 8.0f;
-
-    //primitive path-finding
-    for (uint8 i = 0; i < 8; ++i)
+    float angle = i_cur_angle;
+    if (roll_chance_i(33))
     {
-        angle = i_cur_angle;
-
-        if (roll_chance_i(33))
+        switch (urand(1, 7))
         {
-            switch (urand(1, 7))
-            {
-                case 1:
-                    angle = i_cur_angle + M_PI/4.0f;
-                    break;
-                case 2:
-                    angle = i_cur_angle + M_PI/2.0f;
-                    break;
-                case 3:
-                    angle = i_cur_angle - M_PI/4.0f;
-                    break;
-                case 4:
-                    angle = i_cur_angle - M_PI/2.0f;
-                    break;
-                case 5:
-                    angle = i_cur_angle + M_PI*3/4.0f;
-                    break;
-                case 6:
-                    angle = i_cur_angle - M_PI*3/4.0f;
-                    break;
-                case 7:
-                    angle = i_cur_angle + M_PI;
-                    break;
-            }
+            case 1:
+                angle = i_cur_angle + M_PI/4.0f;
+                break;
+            case 2:
+                angle = i_cur_angle + M_PI/2.0f;
+                break;
+            case 3:
+                angle = i_cur_angle - M_PI/4.0f;
+                break;
+            case 4:
+                angle = i_cur_angle - M_PI/2.0f;
+                break;
+            case 5:
+                angle = i_cur_angle + M_PI*3/4.0f;
+                break;
+            case 6:
+                angle = i_cur_angle - M_PI*3/4.0f;
+                break;
+            case 7:
+                angle = i_cur_angle + M_PI;
+                break;
         }
-
-        // destination point
-        owner.GetValidPointInAngle(temp, distance, angle, true);
-
-        if (i_dest_x != temp.x || i_dest_y != temp.y)
-        {
-            x = i_dest_x = temp.x;
-            y = i_dest_y = temp.y;
-            z = i_dest_z = temp.z;
-            return true;
-        }
-
-        distance /= 2;
     }
 
-    return false;
+    // destination point
+    owner.GetValidPointInAngle(temp, 8.0f, angle, true, true);
+    x = temp.x;
+    y = temp.y;
+    z = temp.z;
+    return true;
 }
 
 template<class T>
@@ -117,7 +99,7 @@ void FleeingMovementGenerator<T>::Initialize(T &owner)
     if (!fright)
         return;
 
-    owner.addUnitState(UNIT_STAT_FLEEING|UNIT_STAT_FLEEING_MOVE);
+    owner.addUnitState(UNIT_STAT_FLEEING);
 
     _Init(owner);
 
@@ -147,20 +129,18 @@ void FleeingMovementGenerator<Player>::_Init(Player &)
 template<>
 void FleeingMovementGenerator<Player>::Finalize(Player &owner)
 {
-    owner.clearUnitState(UNIT_STAT_FLEEING|UNIT_STAT_FLEEING_MOVE);
+    owner.clearUnitState(UNIT_STAT_FLEEING);
 }
 
 template<>
 void FleeingMovementGenerator<Creature>::Finalize(Creature &owner)
 {
-    owner.clearUnitState(UNIT_STAT_FLEEING|UNIT_STAT_FLEEING_MOVE);
+    owner.clearUnitState(UNIT_STAT_FLEEING);
 }
 
 template<class T>
 void FleeingMovementGenerator<T>::Interrupt(T &owner)
 {
-    // flee state still applied while movegen disabled
-    owner.clearUnitState(UNIT_STAT_FLEEING_MOVE);
 }
 
 template<class T>
@@ -177,10 +157,7 @@ bool FleeingMovementGenerator<T>::Update(T &owner, const uint32 & time_diff)
 
     // ignore in case other no reaction state
     if (owner.hasUnitState(UNIT_STAT_CAN_NOT_REACT & ~UNIT_STAT_FLEEING))
-    {
-        owner.clearUnitState(UNIT_STAT_FLEEING_MOVE);
         return true;
-    }
 
     i_nextCheckTime.Update(time_diff);
     if (i_nextCheckTime.Passed() && owner.movespline->Finalized())
@@ -204,7 +181,7 @@ template bool FleeingMovementGenerator<Creature>::Update(Creature &, const uint3
 
 void TimedFleeingMovementGenerator::Finalize(Unit &owner)
 {
-    owner.clearUnitState(UNIT_STAT_FLEEING|UNIT_STAT_FLEEING_MOVE);
+    owner.clearUnitState(UNIT_STAT_FLEEING);
     if (Unit* victim = owner.getVictim())
     {
         if (owner.isAlive())
@@ -222,10 +199,7 @@ bool TimedFleeingMovementGenerator::Update(Unit & owner, const uint32 & time_dif
 
     // ignore in case other no reaction state
     if (owner.hasUnitState(UNIT_STAT_CAN_NOT_REACT & ~UNIT_STAT_FLEEING))
-    {
-        owner.clearUnitState(UNIT_STAT_FLEEING_MOVE);
         return true;
-    }
 
     i_totalFleeTime.Update(time_diff);
     if (i_totalFleeTime.Passed())

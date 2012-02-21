@@ -101,8 +101,7 @@ void PetAI::UpdateMotionMaster()
     }
     else
     {
-        m_creature->clearUnitState(UNIT_STAT_FOLLOW);
-        m_creature->GetMotionMaster()->Clear(false);
+        m_creature->GetMotionMaster()->Clear(false, true);
         m_creature->GetMotionMaster()->MoveIdle();
     }
 }
@@ -214,6 +213,8 @@ void PetAI::AutocastPreparedSpells()
 
         if (m_creature->isPet())
             ((Pet*)m_creature)->CheckLearning(spell->m_spellInfo->Id);
+
+        //m_creature->GetMotionMaster()->StopMovement();
 
         spell->prepare(&targets);
     }

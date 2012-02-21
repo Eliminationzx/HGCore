@@ -281,6 +281,10 @@ enum WorldConfigs
     CONFIG_WAYPOINT_MOVEMENT_ACTIVE_IN_INSTANCES,
     CONFIG_RATE_TARGET_POS_RECALCULATION_RANGE,
 
+    CONFIG_PRIVATE_CHANNEL_LIMIT,
+
+    CONFIG_MMAP_ENABLED,
+
     CONFIG_VALUE_COUNT
 };
 
@@ -463,20 +467,36 @@ enum CumulateMapDiff
 
 struct MapUpdateDiffInfo
 {
-    void ClearDiffInfo()
+
+    ~MapUpdateDiffInfo()
     {
-        for (int i = DIFF_SESSION_UPDATE; i < DIFF_MAX_CUMULATIVE_INFO; i++)
-            _cumulativeDiffInfo[i] = 0;
+        for (CumulativeDiffMap::iterator itr = _cumulativeDiffInfo.begin(); itr != _cumulativeDiffInfo.end(); ++itr)
+            delete itr->second;
     }
 
-    void CumulateDiffFor(CumulateMapDiff type, uint32 diff)
+    void InitializeMapData();
+
+    void ClearDiffInfo()
     {
-        _cumulativeDiffInfo[type] += diff;
+        InitializeMapData();
+        for (CumulativeDiffMap::iterator itr = _cumulativeDiffInfo.begin(); itr != _cumulativeDiffInfo.end(); ++itr)
+        {
+            for (int i = DIFF_SESSION_UPDATE; i < DIFF_MAX_CUMULATIVE_INFO; i++)
+                itr->second[i] = 0;
+        }
+    }
+
+    void CumulateDiffFor(CumulateMapDiff type, uint32 diff, uint32 mapid)
+    {
+        _cumulativeDiffInfo[mapid][type] += diff;
     }
 
     void PrintCumulativeMapUpdateDiff();
 
-    ACE_Atomic_Op<ACE_Thread_Mutex, uint32> _cumulativeDiffInfo[DIFF_MAX_CUMULATIVE_INFO];
+    typedef ACE_Atomic_Op<ACE_Thread_Mutex, uint32> atomic_uint;
+    typedef std::map<uint32, atomic_uint*> CumulativeDiffMap;
+
+    CumulativeDiffMap _cumulativeDiffInfo;
 };
 
 /// The World

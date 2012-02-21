@@ -937,7 +937,7 @@ class TRINITY_DLL_SPEC Player : public Unit
             m_summon_y = y;
             m_summon_z = z;
         }
-        void SummonIfPossible(bool agree);
+        void SummonIfPossible(bool agree, uint64 summonerGUID);
 
         bool Create(uint32 guidlow, const std::string& name, uint8 race, uint8 class_, uint8 gender, uint8 skin, uint8 face, uint8 hairStyle, uint8 hairColor, uint8 facialHair, uint8 outfitId);
 
@@ -1449,10 +1449,13 @@ class TRINITY_DLL_SPEC Player : public Unit
         void SetFreeTalentPoints(uint32 points) { SetUInt32Value(PLAYER_CHARACTER_POINTS1,points); }
         bool resetTalents(bool no_cost = false);
         uint32 resetTalentsCost() const;
+        void UpdateFreeTalentPoints(bool resetIfNeed = true);
         void InitTalentForLevel();
 
-        uint32 GetFreePrimaryProffesionPoints() const { return GetUInt32Value(PLAYER_CHARACTER_POINTS2); }
-        void SetFreePrimaryProffesions(uint16 profs) { SetUInt32Value(PLAYER_CHARACTER_POINTS2,profs); }
+        uint32 CalculateTalentsPoints() const;
+
+        uint32 GetFreePrimaryProfessionPoints() const { return GetUInt32Value(PLAYER_CHARACTER_POINTS2); }
+        void SetFreePrimaryProfessions(uint16 profs) { SetUInt32Value(PLAYER_CHARACTER_POINTS2,profs); }
         void InitPrimaryProffesions();
 
         PlayerSpellMap const& GetSpellMap() const { return m_spells; }
@@ -1686,6 +1689,7 @@ class TRINITY_DLL_SPEC Player : public Unit
         void ResurrectPlayer(float restore_percent, bool applySickness = false);
         void BuildPlayerRepop();
         void RepopAtGraveyard();
+        void TeleportToNearestGraveyard();
 
         void DurabilityLossAll(double percent, bool inventory);
         void DurabilityLoss(Item* item, double percent);
@@ -1845,10 +1849,11 @@ class TRINITY_DLL_SPEC Player : public Unit
         /***               BATTLEGROUND SYSTEM                 ***/
         /*********************************************************/
 
-        bool InBattleGround()       const                { return m_bgBattleGroundID != 0; }
+        bool InBattleGround()       const                   { return m_bgBattleGroundID != 0; }
         bool InArena()              const;
-        uint32 GetBattleGroundId()  const                { return m_bgBattleGroundID; }
-        BattleGroundTypeId GetBattleGroundTypeId() const { return m_bgTypeID; }
+        bool InArenaOrBG()          const                   { return InBattleGround() || InArena(); }
+        uint32 GetBattleGroundId()  const                   { return m_bgBattleGroundID; }
+        BattleGroundTypeId GetBattleGroundTypeId() const    { return m_bgTypeID; }
         BattleGround* GetBattleGround() const;
 
 
