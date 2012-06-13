@@ -3533,6 +3533,8 @@ bool Player::resetTalents(bool no_cost)
                 // unlearn if first rank is talent or learned by talent
                 if (itrFirstId == talentInfo->RankID[j] || spellmgr.IsSpellLearnToSpell(talentInfo->RankID[j],itrFirstId))
                 {
+                    if (itrFirstId == 11129 && HasAura(28682))
+                        RemoveAurasDueToSpell(28682);
                     removeSpell(itr->first,!IsPassiveSpell(itr->first));
                     itr = GetSpellMap().begin();
                     continue;
@@ -6515,6 +6517,9 @@ void Player::CheckDuelDistance(time_t currTime)
         }
         else if (currTime >= (duel->outOfBound+10))
         {
+            CombatStopWithPets(true);
+            if (duel->opponent)
+                duel->opponent->CombatStopWithPets(true);
             DuelComplete(DUEL_FLED);
         }
     }
@@ -15051,7 +15056,10 @@ void Player::_LoadInventory(QueryResultAutoPtr result, uint32 timediff)
                 // the item is in a bag, find the bag
                 std::map<uint64, Bag*>::iterator itr = bagMap.find(bag_guid);
                 if (itr != bagMap.end())
+                {
                     itr->second->StoreItem(slot, item, true);
+                    AddItemDurations(item); // FIXME shouldn't be here. As for now fixes a bug with an infinity of items which should have time duration limit.
+                }
                 else
                     success = false;
             }
@@ -18195,6 +18203,9 @@ bool Player::canSeeOrDetect(Unit const* u, bool detect, bool inVisibleList, bool
             else
                 return true;
         }
+
+        if (u->canDetectInvisibilityOf(this))
+            return true;
 
         // player see other player with stealth/invisibility only if he in same group or raid or same team (raid/team case dependent from conf setting)
         if (!canDetectInvisibilityOf(u))
