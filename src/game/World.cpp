@@ -1487,7 +1487,6 @@ void World::SetInitialWorldSettings()
     m_timers[WUPDATE_GUILD_ANNOUNCES].SetInterval(getConfig(CONFIG_GUILD_ANN_INTERVAL));
     m_timers[WUPDATE_DELETECHARS].SetInterval(DAY*IN_MILISECONDS); // check for chars to delete every day
     m_timers[WUPDATE_OLDMAILS].SetInterval(getConfig(CONFIG_RETURNOLDMAILS_INTERVAL)*1000);
-    m_timers[WUPDATE_EXTERNALMAILS].SetInterval(m_configs[CONFIG_EXTERNAL_MAIL_INTERVAL] * MINUTE * 1000);
 
     //to set mailtimer to return mails every day between 4 and 5 am
     //mailtimer is increased when updating auctions
@@ -1682,17 +1681,6 @@ void World::Update(uint32 diff)
 
         diffRecorder.RecordTimeFor(true, "ResetDailyQuests");
     }
-
-    /// Handle external mail
-    if (m_configs[CONFIG_EXTERNAL_MAIL] != 0 && m_timers[WUPDATE_EXTERNALMAILS].Passed())
-    {
-        m_timers[WUPDATE_EXTERNALMAILS].Reset();
-
-        WorldSession::SendExternalMails();
-
-        diffRecorder.RecordTimeFor(true, "SendExternalMails");
-    }
-
     /// <ul><li> Handle auctions when the timer has passed
     if (m_timers[WUPDATE_OLDMAILS].Passed())
     {
