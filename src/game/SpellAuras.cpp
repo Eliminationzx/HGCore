@@ -5839,7 +5839,8 @@ void Aura::HandleAuraModIncreaseHealth(bool apply, bool Real)
             if (int32(m_target->GetHealth()) > m_modifier.m_amount)
                 m_target->ModifyHealth(-m_modifier.m_amount);
             else
-                m_target->SetHealth(1);
+                m_target->SetHealth(1, !m_target->isAlive());
+
             m_target->HandleStatModifier(UNIT_MOD_HEALTH, TOTAL_VALUE, float(GetModifierValue()), apply);
         }
     }
@@ -6683,6 +6684,14 @@ void Aura::CleanupTriggeredSpells()
     {
         m_target->RemoveAurasDueToSpell(m_spellProto->EffectTriggerSpell[1]);  // remove triggered effect of shattrath flask, when removing it
         return;
+    }
+
+    // Check if Shadow Embrace should be removed
+    if (m_spellProto->SpellFamilyName == SPELLFAMILY_WARLOCK && m_spellProto->SpellFamilyFlags & 0x0000001100000402LL)
+    {
+        // if target don't have any other siphon/corruption auras from caster then remove shadow embrance auras (by caster)
+        if (!m_target->HasAuraByCasterWithFamilyFlags(GetCasterGUID(), SPELLFAMILY_WARLOCK, 0x0000001100000402LL, this))
+            m_target->RemoveAurasWithFamilyFlagsAndTypeByCaster(SPELLFAMILY_WARLOCK, 0x0000000080000000LL, SPELL_AURA_MOD_DAMAGE_PERCENT_DONE, GetCasterGUID());
     }
 
     uint32 tSpellId = m_spellProto->EffectTriggerSpell[GetEffIndex()];

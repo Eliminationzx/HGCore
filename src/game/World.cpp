@@ -134,20 +134,20 @@ World::World()
     loggedInHordes = 0;
 
     // TODO: move to config
-    m_honorRanks[0] = 10000000;//100;
-    m_honorRanks[1] = 10000000;//500;
-    m_honorRanks[2] = 10000000;//1000;
-    m_honorRanks[3] = 10000000;//2000;
-    m_honorRanks[4] = 10000000;//5000;
-    m_honorRanks[5] = 10000000;//10000;
-    m_honorRanks[6] = 10000000;//16000;
-    m_honorRanks[7] = 10000000;//23000;
-    m_honorRanks[8] = 10000000;//31000;
-    m_honorRanks[9] = 10000000;//40000;
-    m_honorRanks[10] = 10000000;//50000;
-    m_honorRanks[11] = 10000000;//60000;
-    m_honorRanks[12] = 10000000;//75000;
-    m_honorRanks[13] = 10000000;//100000;
+    m_honorRanks[0] = 100;
+    m_honorRanks[1] = 500;
+    m_honorRanks[2] = 1000;
+    m_honorRanks[3] = 2000;
+    m_honorRanks[4] = 5000;
+    m_honorRanks[5] = 10000;
+    m_honorRanks[6] = 16000;
+    m_honorRanks[7] = 23000;
+    m_honorRanks[8] = 31000;
+    m_honorRanks[9] = 40000;
+    m_honorRanks[10] = 50000;
+    m_honorRanks[11] = 60000;
+    m_honorRanks[12] = 70000;
+    m_honorRanks[13] = 100000;
 }
 
 /// World destructor
@@ -957,7 +957,8 @@ void World::LoadConfigSettings(bool reload)
     m_configs[CONFIG_DEATH_BONES_WORLD]       = sConfig.GetBoolDefault("Death.Bones.World", true);
     m_configs[CONFIG_DEATH_BONES_BG_OR_ARENA] = sConfig.GetBoolDefault("Death.Bones.BattlegroundOrArena", true);
 
-    m_configs[CONFIG_THREAT_RADIUS] = sConfig.GetIntDefault("ThreatRadius", 60);
+    m_configs[CONFIG_EVADE_HOMEDIST] = sConfig.GetIntDefault("Creature.Evade.DistanceToHome", 50);
+    m_configs[CONFIG_EVADE_TARGETDIST] = sConfig.GetIntDefault("Creature.Evade.DistanceToTarget", 45);
 
     // always use declined names in the russian client
     m_configs[CONFIG_DECLINED_NAMES_USED] =
@@ -2311,20 +2312,26 @@ BanReturn World::BanAccount(BanMode mode, std::string nameIPOrMail, std::string 
     {
         case BAN_IP:
             //No SQL injection as strings are escaped
-            resultAccounts = AccountsDatabase.PQuery("SELECT id FROM account WHERE last_ip = '%s'",nameIPOrMail.c_str());
-            AccountsDatabase.PExecute("INSERT INTO ip_banned VALUES ('%s',UNIX_TIMESTAMP(),UNIX_TIMESTAMP()+%u,'%s','%s')",nameIPOrMail.c_str(),duration_secs,safe_author.c_str(),reason.c_str());
+            resultAccounts = AccountsDatabase.PQuery("SELECT a.id, aa.gmlevel "
+                                                     "FROM account AS a LEFT JOIN account_access AS aa "
+                                                     "      ON (a.id = aa.id AND (aa.RealmID = '%d' OR aa.RealmID = '-1')) "
+                                                     "WHERE last_ip = '%s'", realmID, nameIPOrMail.c_str());
+            AccountsDatabase.PExecute("INSERT INTO ip_banned VALUES ('%s',UNIX_TIMESTAMP(),UNIX_TIMESTAMP()+%u,'%s','%s')", nameIPOrMail.c_str(), duration_secs, safe_author.c_str(), reason.c_str());
             break;
         case BAN_ACCOUNT:
             //No SQL injection as string is escaped
-            resultAccounts = AccountsDatabase.PQuery("SELECT a.id,aa.gmlevel FROM account a LEFT JOIN account_access aa ON (a.id = aa.id AND (aa.RealmID = '%d' OR aa.RealmID = '-1')) WHERE a.username = '%s'",realmID, nameIPOrMail.c_str());
+            resultAccounts = AccountsDatabase.PQuery("SELECT a.id, aa.gmlevel FROM account a LEFT JOIN account_access aa ON (a.id = aa.id AND (aa.RealmID = '%d' OR aa.RealmID = '-1')) WHERE a.username = '%s'", realmID, nameIPOrMail.c_str());
             break;
         case BAN_CHARACTER:
             //No SQL injection as string is escaped
             resultAccounts = RealmDataDatabase.PQuery("SELECT account FROM characters WHERE name = '%s'",nameIPOrMail.c_str());
             break;
         case BAN_EMAIL:
-            resultAccounts = AccountsDatabase.PQuery("SELECT a.id,aa.gmlevel FROM account a LEFT JOIN account_access aa ON (a.id = aa.id AND (aa.RealmID = '%d' OR aa.RealmID = '-1')) WHERE a.email = '%s'",realmID, nameIPOrMail.c_str());
-            AccountsDatabase.PExecute("INSERT INTO email_banned VALUES ('%s',UNIX_TIMESTAMP(),'%s','%s')",nameIPOrMail.c_str(),safe_author.c_str(),reason.c_str());
+            resultAccounts = AccountsDatabase.PQuery("SELECT a.id, aa.gmlevel "
+                                                     "FROM account a LEFT JOIN account_access aa "
+                                                     "      ON (a.id = aa.id AND (aa.RealmID = '%d' OR aa.RealmID = '-1')) "
+                                                     "WHERE a.email = '%s'", realmID, nameIPOrMail.c_str());
+            AccountsDatabase.PExecute("INSERT INTO email_banned VALUES ('%s',UNIX_TIMESTAMP(),'%s','%s')", nameIPOrMail.c_str(), safe_author.c_str(), reason.c_str());
             break;
         default:
             return BAN_SYNTAX_ERROR;
@@ -2406,7 +2413,7 @@ bool World::RemoveBanAccount(BanMode mode, std::string nameIPOrMail)
                 return false;
 
             //NO SQL injection as account is uint32
-            sWorld.getConfig(CONFIG_REALM_BANS) ? AccountsDatabase.PExecute("UPDATE account_banned SET active = '0' WHERE id = '%u' AND realm = '%u'",account,realmID) 
+            sWorld.getConfig(CONFIG_REALM_BANS) ? AccountsDatabase.PExecute("UPDATE account_banned SET active = '0' WHERE id = '%u' AND realm = '%u'",account,realmID)
                                                 : AccountsDatabase.PExecute("UPDATE account_banned SET active = '0' WHERE id = '%u'",account);
             break;
     }

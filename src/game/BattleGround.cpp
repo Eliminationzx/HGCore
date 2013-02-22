@@ -33,6 +33,7 @@
 #include "ObjectMgr.h"
 #include "WorldPacket.h"
 #include "Util.h"
+#include "BattleGroundNA.h"
 
 BattleGround::BattleGround()
 {
@@ -94,6 +95,8 @@ BattleGround::BattleGround()
     m_PrematureCountDown = 0;
 
     m_HonorMode = BG_NORMAL;
+
+    m_progressStart = 0;
 }
 
 BattleGround::~BattleGround()
@@ -289,6 +292,16 @@ void BattleGround::Update(uint32 diff)
                 m_RemovedPlayers[itr->first] = 1;           // add to remove list (BG)
             }
             // do not change any battleground's private variables
+        }
+    }
+
+    if (isArena() && GetStatus() == STATUS_IN_PROGRESS)
+    {
+        uint8 dct = 5;
+        if (GetMapId() == 559 && dct && dct < (time(NULL) - m_progressStart))
+        {
+            for (uint32 i = BG_NA_OBJECT_DOOR_1; i <= BG_NA_OBJECT_DOOR_2; i++)
+                DelObject(i);
         }
     }
 }
@@ -859,7 +872,7 @@ void BattleGround::RemovePlayerAtLeave(uint64 guid, bool Transport, bool SendPac
             if (isArena())
             {
                 plr->RemoveArenaAuras(true);    // removes debuffs / dots etc., we don't want the player to die after porting out
-                plr->GetMotionMaster()->MoveIdle();
+                plr->GetMotionMaster()->MovementExpired();
 
                 bgTypeId=BATTLEGROUND_AA;       // set the bg type to all arenas (it will be used for queue refreshing)
 
@@ -1195,13 +1208,15 @@ void BattleGround::UpdatePlayerScore(Player *Source, uint32 type, uint32 value)
             break;
         case SCORE_DEATHS:                                  // Deaths
             itr->second->Deaths += value;
+            if (itr->second->Deaths >= 50)
+                Source->LoseHonor = true;
             break;
         case SCORE_HONORABLE_KILLS:                         // Honorable kills
             itr->second->HonorableKills += value;
             break;
         case SCORE_BONUS_HONOR:                             // Honor bonus
             // do not add honor in arenas
-            if (isBattleGround())
+            if (isBattleGround() && !Source->LoseHonor)
             {
                 // reward honor instantly
                 if (Source->RewardHonor(NULL, 1, value))
@@ -1786,4 +1801,11 @@ void BattleGround::SetBgRaid( uint32 TeamID, Group *bg_raid )
         bg_raid->SetBattlegroundGroup(this);
 
     old_raid = bg_raid;
+}
+
+void BattleGround::SetStatus(uint32 Status)
+{
+    m_Status = Status;
+    if (Status == STATUS_IN_PROGRESS)
+        m_progressStart = time(NULL);
 }

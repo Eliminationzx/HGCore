@@ -726,6 +726,7 @@ bool SpellMgr::IsPositiveEffect(uint32 spellId, uint32 effIndex)
         case 30422:
         case 30423:
         case 47002:                                         // Noxious Fumes (not sure if needed, just in case)
+        case 41350:                                         // Aura of Desire
             return false;
     }
 
@@ -2955,6 +2956,10 @@ void SpellMgr::LoadSpellCustomAttr()
                 spellInfo->EffectImplicitTargetA[0] = spellInfo->EffectImplicitTargetA[1] = TARGET_UNIT_CASTER;
                 spellInfo->EffectImplicitTargetB[0] = spellInfo->EffectImplicitTargetB[1] = 0;
                 break;
+            /* WARLOCK CUSTOM ATTRIBUTES */
+            case 27285:                     // Seed of Corruption - final boom damage
+                spellInfo->AttributesEx3 |= SPELL_ATTR_EX3_CANT_TRIGGER_PROC;
+                break;
             // Triggered spells that should be delayed
             case 20272:                     // Illumination
             case 32848:                     // Mana Restore
@@ -2996,6 +3001,9 @@ void SpellMgr::LoadSpellCustomAttr()
             case 38297:
                 spellInfo->Effect[0] = 0;
                 spellInfo->EffectApplyAuraName[1] = SPELL_AURA_DUMMY;
+                break;
+            case 41350:
+                spellInfo->Attributes |= SPELL_ATTR_CANT_CANCEL;
                 break;
             // do NOT remove encapsulate on druid shapeshift, attribute is added higher, so is safe to remove it here
             case 45665:
@@ -3287,6 +3295,7 @@ void SpellMgr::LoadSpellCustomAttr()
                 break;
             case 43383: // Spirit Bolts (HexLord)
                 spellInfo->ChannelInterruptFlags |= CHANNEL_FLAG_MOVEMENT;
+                spellInfo->InterruptFlags &= ~SPELL_INTERRUPT_FLAG_INTERRUPT;
                 break;
             case 29962: // Summon Elemental (Shade of Aran)
             case 37053:
@@ -4024,6 +4033,9 @@ DiminishingGroup SpellMgr::GetDiminishingReturnsGroupForSpell(SpellEntry const* 
             // Freezing trap
             if (spellproto->SpellFamilyFlags & 0x00000000008LL)
                 return DIMINISHING_FREEZE;
+            // Intimidation
+            else if (spellproto->Id == 24394)
+                return DIMINISHING_CONTROL_STUN;
             break;
         }
         case SPELLFAMILY_WARLOCK:
@@ -4040,7 +4052,7 @@ DiminishingGroup SpellMgr::GetDiminishingReturnsGroupForSpell(SpellEntry const* 
             // Curses/etc
             else if (spellproto->SpellFamilyFlags & 0x00080000000LL)
                 return DIMINISHING_LIMITONLY;
-            // Unstable affliction dispel silence
+            // Unstable Affliction dispel silence
             else if (spellproto->Id == 31117)
                 return DIMINISHING_UNSTABLE_AFFLICTION;
             // Enslave deamon

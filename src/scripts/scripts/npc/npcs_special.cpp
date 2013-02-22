@@ -2574,6 +2574,211 @@ CreatureAI* GetAI_npc_small_pet_handler(Creature* pCreature)
     return new npc_small_pet_handlerAI(pCreature);
 }
 
+bool GossipHello_npc_combatstop(Player* player, Creature* _Creature) 
+{ 
+    player->ADD_GOSSIP_ITEM(0, "Clear in combat state.", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1); 
+
+    // Hey there, $N. How can I help you?
+    player->SEND_GOSSIP_MENU(2, _Creature->GetGUID()); 
+    return true; 
+} 
+
+bool GossipSelect_npc_combatstop(Player* player, Creature* _Creature, uint32 sender, uint32 action) 
+{ 
+    if (action == GOSSIP_ACTION_INFO_DEF + 1)
+        player->CombatStop(true); 
+
+    return true; 
+}
+
+struct npc_resurrectAI : public Scripted_NoMovementAI
+{
+    npc_resurrectAI(Creature* c) : Scripted_NoMovementAI(c) {}
+
+    TimeTrackerSmall timer;
+
+    void Reset() override
+    {
+        me->SetReactState(REACT_PASSIVE);
+        timer.Reset(2000);
+    }
+
+    void MoveInLineOfSight(Unit *who) override {}
+    void AttackStart(Unit* who) override {}
+    void EnterCombat(Unit *who) override {}
+
+    void UpdateAI(const uint32 uiDiff) override
+    {
+        timer.Update(uiDiff);
+        if (timer.Passed())
+        {
+            std::list<Player*> players;
+            Hellground::AnyPlayerInObjectRangeCheck check(me, 15.0f, false);
+            Hellground::ObjectListSearcher<Player, Hellground::AnyPlayerInObjectRangeCheck> searcher(players, check);
+
+            Cell::VisitAllObjects(me, searcher, 15.0f);
+
+            players.remove_if([this](Player* plr) -> bool { return me->IsHostileTo(plr); });
+
+            while (!players.empty())
+            {
+                Player* player = players.front();
+
+                players.pop_front();
+
+                player->ResurrectPlayer(10.0f);
+                player->CastSpell(player, SPELL_RESURRECTION_VISUAL, true);   // Resurrection visual
+            }
+            timer.Reset(2000);
+        }
+    }
+};
+
+CreatureAI* GetAI_npc_resurrect(Creature* pCreature)
+{
+    return new npc_resurrectAI(pCreature);
+}
+
+enum TargetDummySpells
+{
+    TARGET_DUMMY_PASSIVE = 4044,
+    TARGET_DUMMY_SPAWN_EFFECT = 4507,
+
+    ADVANCED_TARGET_DUMMY_PASSIVE = 4048,
+    ADVANCED_TARGET_DUMMY_SPAWN_EFFECT = 4092,
+
+    MASTER_TARGET_DUMMY_PASSIVE = 19809,
+};
+
+enum TargetDummyEntry
+{
+    TARGET_DUMMY = 2673,
+    ADV_TARGET_DUMMY = 2674,
+    MASTER_TARGET_DUMMY = 12426
+};
+
+struct npc_target_dummyAI : public Scripted_NoMovementAI
+{
+    npc_target_dummyAI(Creature* c) : Scripted_NoMovementAI(c) {}
+
+    void Reset() override
+    {
+        me->SetReactState(REACT_PASSIVE);
+
+        ClearCastQueue();
+
+        TargetDummySpells spawneffect;
+        TargetDummySpells passive;
+
+        switch (me->GetEntry())
+        {
+            case TARGET_DUMMY:
+            {
+                spawneffect = TARGET_DUMMY_SPAWN_EFFECT;
+                passive = TARGET_DUMMY_PASSIVE;
+                break;
+            }
+            case ADV_TARGET_DUMMY:
+            {
+                spawneffect = ADVANCED_TARGET_DUMMY_SPAWN_EFFECT;
+                passive = ADVANCED_TARGET_DUMMY_PASSIVE;
+                break;
+            }
+            case MASTER_TARGET_DUMMY:
+            {
+                spawneffect = ADVANCED_TARGET_DUMMY_SPAWN_EFFECT;
+                passive = MASTER_TARGET_DUMMY_PASSIVE;
+                break;
+            }
+        }
+
+        AddSpellToCast(passive, CAST_SELF);
+        AddSpellToCast(spawneffect, CAST_SELF);
+    }
+
+    void AttackStart(Unit* who) override {}
+    void EnterCombat(Unit *who) override {}
+    void MoveInLineOfSight(Unit* who) override {}
+
+    void UpdateAI(const uint32 diff) override
+    {
+        CastNextSpellIfAnyAndReady();
+    }
+};
+
+CreatureAI* GetAI_npc_target_dummy(Creature* pCreature)
+{
+    return new npc_target_dummyAI(pCreature);
+}
+
+enum ExplosiveSheepExplosion
+{
+    EXPLOSIVE_SHEEP_EXPLOSION = 4050,
+    HIGH_EXPLOSIVE_SHEEP_EXPLOSION = 44279,
+};
+
+enum ExplosiveSheepEntry
+{
+    EXPLOSIVE_SHEEP = 2675,
+    HIGH_EXPLOSIVE_SHEEP = 24715
+};
+
+struct npc_explosive_sheepAI : public ScriptedAI
+{
+    npc_explosive_sheepAI(Creature* c) : ScriptedAI(c) {}
+
+    TimeTrackerSmall explosionTimer;
+
+    void JustRespawned() override
+    {
+        explosionTimer.Reset(10000);
+    }
+
+    void Reset() override
+    {
+        me->SetReactState(REACT_PASSIVE);
+
+        ClearCastQueue();
+    }
+
+    void AttackStart(Unit* who) override {}
+    void EnterCombat(Unit *who) override {}
+    void MoveInLineOfSight(Unit* who) override {}
+
+    void UpdateAI(const uint32 diff) override
+    {
+        explosionTimer.Update(diff);
+        if (explosionTimer.Passed())
+        {
+            ForceSpellCast(me->GetEntry() == EXPLOSIVE_SHEEP ? EXPLOSIVE_SHEEP_EXPLOSION : HIGH_EXPLOSIVE_SHEEP_EXPLOSION, CAST_SELF, INTERRUPT_AND_CAST, true);
+            me->ForcedDespawn();
+            return;
+        }
+
+        if (me->getVictim() == nullptr)
+        {
+            if (Unit* target = me->SelectNearestTarget())
+                ScriptedAI::AttackStart(target);
+        }
+        else
+        {
+            if (me->IsWithinDistInMap(me->getVictim(), 2.0f))
+            {
+                ForceSpellCast(me->GetEntry() == EXPLOSIVE_SHEEP ? EXPLOSIVE_SHEEP_EXPLOSION : HIGH_EXPLOSIVE_SHEEP_EXPLOSION, CAST_SELF, INTERRUPT_AND_CAST, true);
+                me->ForcedDespawn();
+                return;
+            }
+        }
+
+        CastNextSpellIfAnyAndReady();
+    }
+};
+
+CreatureAI* GetAI_npc_explosive_sheep(Creature* pCreature)
+{
+    return new npc_explosive_sheepAI(pCreature);
+}
+
 void AddSC_npcs_special()
 {
     Script *newscript;
@@ -2741,5 +2946,26 @@ void AddSC_npcs_special()
     newscript = new Script;
     newscript->Name = "npc_small_pet_handler";
     newscript->GetAI = &GetAI_npc_small_pet_handler;
+    newscript->RegisterSelf();
+
+    newscript = new Script;
+    newscript->Name = "npc_combatstop";
+    newscript->pGossipHello =  &GossipHello_npc_combatstop;
+    newscript->pGossipSelect = &GossipSelect_npc_combatstop;
+    newscript->RegisterSelf();
+
+    newscript = new Script;
+    newscript->Name = "npc_resurrect";
+    newscript->GetAI = &GetAI_npc_resurrect;
+    newscript->RegisterSelf();
+
+    newscript = new Script;
+    newscript->Name = "npc_target_dummy";
+    newscript->GetAI = &GetAI_npc_target_dummy;
+    newscript->RegisterSelf();
+
+    newscript = new Script;
+    newscript->Name = "npc_explosive_sheep";
+    newscript->GetAI = &GetAI_npc_explosive_sheep;
     newscript->RegisterSelf();
 }

@@ -2716,10 +2716,12 @@ void Spell::EffectTriggerMissileSpell(uint32 effect_idx)
 
     SpellCastTargets targets;
 
-    if (triggered_spell_id == 44008)     // Static Disruption needs direct targeting
+    if (!spellInfo->IsDestTargetEffect(effect_idx))
+//    if (triggered_spell_id == 44008)     // Static Disruption needs direct targeting
         targets.setUnitTarget(unitTarget);
     else
         targets.setDestination(m_targets.m_destX,m_targets.m_destY,m_targets.m_destZ);
+
     spell->m_CastItem = m_CastItem;
     spell->prepare(&targets, NULL);
 }
@@ -6657,18 +6659,22 @@ void Spell::EffectSummonPlayer(uint32 /*i*/)
     if (unitTarget->GetDummyAura(23445))
         return;
 
+    if (!unitTarget->ToPlayer()->CanBeSummonedBy(m_caster->ToPlayer()))
+        return;
+
+    const Player * pCaster = m_caster->ToPlayer();
     float x,y,z;
     m_caster->GetClosePoint(x,y,z,unitTarget->GetObjectSize());
 
-    ((Player*)unitTarget)->SetSummonPoint(m_caster->GetMapId(),x,y,z);
+    unitTarget->ToPlayer()->SetSummonPoint(m_caster->GetMapId(),x,y,z);
 
-    uint32 zoneid = m_caster->GetTypeId() == TYPEID_PLAYER ? ((Player*)m_caster)->GetCachedZone() : m_caster->GetZoneId();
+    uint32 zoneid = pCaster ? pCaster->GetCachedZone() : m_caster->GetZoneId();
 
     WorldPacket data(SMSG_SUMMON_REQUEST, 8+4+4);
     data << uint64(m_caster->GetGUID());                    // summoner guid
     data << uint32(zoneid);                                 // summoner zone
     data << uint32(MAX_PLAYER_SUMMON_DELAY*1000);           // auto decline after msecs
-    ((Player*)unitTarget)->SendPacketToSelf(&data);
+    unitTarget->ToPlayer()->SendPacketToSelf(&data);
 }
 
 static ScriptInfo generateActivateCommand()

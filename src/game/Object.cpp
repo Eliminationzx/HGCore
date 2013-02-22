@@ -90,7 +90,7 @@ Object::~Object()
         if (IsInWorld())
         {
             ///- Do NOT call RemoveFromWorld here, if the object is a player it will crash
-            sLog.outLog(LOG_DEFAULT, "ERROR: Object::~Object - guid="UI64FMTD", typeid=%d deleted but still in world!!", GetGUID(), GetTypeId());
+            sLog.outLog(LOG_DEFAULT, "ERROR: Object::~Object - guid=" UI64FMTD ", typeid=%d deleted but still in world!!", GetGUID(), GetTypeId());
             ASSERT(false);
         }
 
@@ -1761,8 +1761,11 @@ Pet* Player::SummonPet(uint32 entry, float x, float y, float z, float ang, PetTy
             pet->clearUnitState(UNIT_STAT_FOLLOW);
             pet->SendPetAIReaction(pet->GetGUID());
         }
-        else if(entry == 510)
+        else if (entry == 510)
+        {
             pet->ApplySpellImmune(0, IMMUNITY_SCHOOL, SPELL_SCHOOL_MASK_FROST, true);
+            pet->ApplySpellImmune(0, IMMUNITY_DISPEL, DISPEL_POISON, true);
+        }
 
         return NULL;
     }

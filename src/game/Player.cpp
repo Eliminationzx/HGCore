@@ -455,6 +455,8 @@ Player::Player (WorldSession *session): Unit(), m_reputationMgr(this), m_camera(
 
     _preventSave = false;
     _preventUpdate = false;
+
+    LoseHonor = false;
 }
 
 Player::~Player ()
@@ -5272,25 +5274,16 @@ void Player::UpdateWeaponSkill (WeaponAttackType attType)
 void Player::UpdateCombatSkills(Unit *pVictim, WeaponAttackType attType, bool defence)
 {
     uint32 plevel = getLevel();                             // if defense than pVictim == attacker
-    //uint32 greylevel = Hellground::XP::GetGrayLevel(plevel);
     uint32 moblevel = pVictim->getLevelForTarget(this);
-    //if (moblevel < greylevel)
-    //    return;
 
     if (moblevel > plevel + 5)
         moblevel = plevel + 5;
 
-    uint32 lvldif = 0;
+    float lvldif = 1.5f;
     if (moblevel >= plevel)
     {
         lvldif = moblevel - plevel;
         if (lvldif < 3)
-            lvldif = 3;
-    }
-    else
-    {
-        lvldif = plevel - moblevel;
-        if (lvldif > 3)
             lvldif = 3;
     }
 
@@ -5298,9 +5291,9 @@ void Player::UpdateCombatSkills(Unit *pVictim, WeaponAttackType attType, bool de
     if (skilldif <= 0)
         return;
 
-    float chance = float(3 * lvldif * skilldif) / plevel;
+    float chance = float(3 * lvldif * skilldif) / plevel*0.75f;
     if (!defence)
-        chance *= 0.1f * GetStat(STAT_INTELLECT);
+        chance += 0.1f * GetStat(STAT_INTELLECT);
 
     chance = chance < 1.0f ? 1.0f : chance;                 //minimum chance to increase skill is 1%
 
@@ -6053,6 +6046,14 @@ void Player::UpdateHonorFields()
 ///An exact honor value can also be given (overriding the calcs)
 bool Player::RewardHonor(Unit *uVictim, uint32 groupsize, float honor, bool pvptoken, bool killer)
 {
+    // Players that have the resurrection sickness debuff will be worth no honor
+    if (HasAura(SPELL_ID_PASSIVE_RESURRECTION_SICKNESS))
+        return true;
+
+    // Used for battlegrounds
+    if (LoseHonor)
+        return true;
+
     // do not reward honor in arenas, but enable onkill spellproc
     if (InArena())
     {
@@ -6186,7 +6187,7 @@ bool Player::RewardHonor(Unit *uVictim, uint32 groupsize, float honor, bool pvpt
 
     // add honor points
     ModifyHonorPoints(int32(honor));
-    //UpdatePvpTitles();
+    UpdatePvpTitles();
     ApplyModUInt32Value(PLAYER_FIELD_TODAY_CONTRIBUTION, uint32(honor), true);
 
     if (sWorld.getConfig(CONFIG_PVP_TOKEN_ENABLE) && pvptoken)
@@ -7073,7 +7074,7 @@ void Player::CastItemCombatSpell(Unit *target, WeaponAttackType attType, uint32 
                             default: slot = EQUIPMENT_SLOT_END; break;
                         }
 
-                        if (attType == RANGED_ATTACK && slot == EQUIPMENT_SLOT_MAINHAND)
+                        if (attType == RANGED_ATTACK && i == EQUIPMENT_SLOT_MAINHAND)
                         {
                             // exception for Righteous Weapon Coating, enchant on main hand should also proc from ranged attacks
                             if(uint32 enchant_id = item->GetEnchantmentId(EnchantmentSlot(TEMP_ENCHANTMENT_SLOT)))
@@ -7082,7 +7083,7 @@ void Player::CastItemCombatSpell(Unit *target, WeaponAttackType attType, uint32 
                                 if(pEnchant && pEnchant->ID == 3266) // Blessed Weapon Coating
                                 {
                                     ((Player*)this)->CastItemCombatSpell(target, attType, procVictim, procEx, item, proto, spellInfo);
-                                    break;
+                                    continue;
                                 }
                             }
                         }
@@ -10621,7 +10622,7 @@ Item* Player::EquipItem(uint16 pos, Item *pItem, bool update)
                     m_weaponChangeTimer = spellProto->StartRecoveryTime;
 
                     if (getClass() != CLASS_ROGUE)
-                        GetGlobalCooldownMgr().AddGlobalCooldown(spellProto, m_weaponChangeTimer);
+                        GetCooldownMgr().AddGlobalCooldown(spellProto, m_weaponChangeTimer);
 
                     WorldPacket data(SMSG_SPELL_COOLDOWN, 8+1+4);
                     data << uint64(GetGUID());
@@ -14729,7 +14730,7 @@ bool Player::LoadFromDB(uint32 guid, SqlQueryHolder *holder)
 
     // check PLAYER_CHOSEN_TITLE compatibility with PLAYER__FIELD_KNOWN_TITLES
     // note: PLAYER__FIELD_KNOWN_TITLES updated at quest status loaded
-    SetUInt32Value(PLAYER__FIELD_KNOWN_TITLES, (GetUInt32Value(PLAYER__FIELD_KNOWN_TITLES) & ~PLAYER_TITLE_PVP));
+    SetUInt64Value(PLAYER__FIELD_KNOWN_TITLES, fields[42].GetUInt64());
     if (uint32 curTitle = GetUInt32Value(PLAYER_CHOSEN_TITLE))
     {
         if (!HasTitle(curTitle))
@@ -15924,13 +15925,13 @@ void Player::SaveToDB()
                                             "taximask, online, cinematic, "
                                             "totaltime, leveltime, rest_bonus, logout_time, is_logout_resting, resettalents_cost, resettalents_time, "
                                             "trans_x, trans_y, trans_z, trans_o, transguid, extra_flags, stable_slots, at_login, zone, "
-                                            "death_expire_time, taxi_path, arena_pending_points, latency) "
+                                            "death_expire_time, taxi_path, arena_pending_points, latency, title) "
                                             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "
                                                 "?, ?, ?, ?, ?, ?, ?, ?, "
                                                 "?, ?, ?, "
                                                 "?, ?, ?, ?, ?, ?, ?, "
                                                 "?, ?, ?, ?, ?, ?, ?, ?, ?, "
-                                                "?, ?, ?, ?)");
+                                                "?, ?, ?, ?, ?)");
 
     stmt.addUInt32(GetGUIDLow());
     stmt.addUInt32(GetSession()->GetAccountId());
@@ -16008,6 +16009,7 @@ void Player::SaveToDB()
     stmt.addString(m_taxi.SaveTaxiDestinationsToString());
     stmt.addUInt32(0);
     stmt.addUInt32(GetSession()->GetLatency());
+    stmt.addUInt64(GetUInt64Value(PLAYER__FIELD_KNOWN_TITLES));
     stmt.Execute();
 
     if (m_mailsUpdated)                                      //save mails only when needed
@@ -17231,7 +17233,7 @@ void Player::PossessSpellInitialize()
 
     if (!charmInfo)
     {
-        sLog.outLog(LOG_DEFAULT, "ERROR: Player::PossessSpellInitialize(): charm ("UI64FMTD") has no charminfo!", charm->GetGUID());
+        sLog.outLog(LOG_DEFAULT, "ERROR: Player::PossessSpellInitialize(): charm (" UI64FMTD ") has no charminfo!", charm->GetGUID());
         return;
     }
 
@@ -17267,7 +17269,7 @@ void Player::CharmSpellInitialize()
     CharmInfo *charmInfo = charm->GetCharmInfo();
     if (!charmInfo)
     {
-        sLog.outLog(LOG_DEFAULT, "ERROR: Player::CharmSpellInitialize(): the player's charm ("UI64FMTD") has no charminfo!", charm->GetGUID());
+        sLog.outLog(LOG_DEFAULT, "ERROR: Player::CharmSpellInitialize(): the player's charm (" UI64FMTD ") has no charminfo!", charm->GetGUID());
         return;
     }
 
@@ -18412,6 +18414,9 @@ bool Player::canSeeOrDetect(Unit const* u, WorldObject const* viewPoint, bool de
     if (u == this)
         return true;
 
+    if (u->GetObjectGuid().IsAnyTypeCreature() && u->ToCreature()->IsAIEnabled && !u->ToCreature()->AI()->IsVisible())
+        return false;
+
     // player visible for other player if not logout and at same transport
     // including case when player is out of world
     bool at_same_transport =
@@ -19321,15 +19326,47 @@ void Player::UpdateForQuestsGO()
     SendPacketToSelf(&packet);
 }
 
+bool Player::CanBeSummonedBy(const Unit * summoner)
+{
+    if (!summoner)
+        return false;
+
+    // if summoning to instance
+    if (summoner->GetMap()->IsDungeon())
+    {
+        // check for permbinded id's
+        InstanceSave * tmpInst = GetInstanceSave(summoner->GetMapId());
+        if (tmpInst)
+        {
+            if (tmpInst->GetInstanceId() != summoner->GetInstanceId())
+                return false;
+        }
+        // check for temp id's
+        else if (GetMap()->IsDungeon() && GetMapId() == summoner->GetMapId() && GetInstanceId() != summoner->GetInstanceId())
+            return false;
+    }
+
+    return true;
+}
+
+bool Player::CanBeSummonedBy(uint64 summoner)
+{
+    return CanBeSummonedBy(GetUnit(summoner));
+}
+
 void Player::SummonIfPossible(bool agree, uint64 summonerGUID)
 {
-    if(Unit* summoner = GetUnit(summonerGUID))
+    Unit* summoner = GetUnit(summonerGUID);
+    if (summoner)
     {
         if (summoner->m_currentSpells[CURRENT_CHANNELED_SPELL])
         {
             summoner->m_currentSpells[CURRENT_CHANNELED_SPELL]->SendChannelUpdate(0);
             summoner->m_currentSpells[CURRENT_CHANNELED_SPELL]->finish();
         }
+
+        if (!CanBeSummonedBy(summoner))
+            return;
     }
 
     if (!agree)

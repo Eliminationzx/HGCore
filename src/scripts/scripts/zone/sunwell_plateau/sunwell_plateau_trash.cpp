@@ -65,13 +65,6 @@ struct mob_sunblade_arch_mageAI : public ScriptedAI
         Blink = urand(10000, 18000);
     }
 
-    void EnterEvadeMode()
-    {
-        if (CreatureGroup *formation = me->GetFormation())
-            formation->RespawnFormation(me);
-        ScriptedAI::EnterEvadeMode();
-    }
-
     void EnterCombat(Unit*) { DoZoneInCombat(80.0f); }
 
     void UpdateAI(const uint32 diff)
@@ -152,13 +145,6 @@ struct mob_sunblade_cabalistAI : public ScriptedAI
     void AttackStart(Unit* who)
     {
         ScriptedAI::AttackStartNoMove(who, CHECK_TYPE_CASTER);
-    }
-
-    void EnterEvadeMode()
-    {
-        if (CreatureGroup *formation = me->GetFormation())
-            formation->RespawnFormation(me);
-        ScriptedAI::EnterEvadeMode();
     }
 
     void EnterCombat(Unit*) { DoZoneInCombat(80.0f); }
@@ -247,13 +233,6 @@ struct mob_sunblade_dawn_priestAI : public ScriptedAI
         canSelfRenew = true;
     }
 
-    void EnterEvadeMode()
-    {
-        if (CreatureGroup *formation = me->GetFormation())
-            formation->RespawnFormation(me);
-        ScriptedAI::EnterEvadeMode();
-    }
-
     void EnterCombat(Unit*) { DoZoneInCombat(80.0f); }
 
     void UpdateAI(const uint32 diff)
@@ -339,13 +318,6 @@ struct mob_sunblade_dusk_priestAI : public ScriptedAI
         Fear = urand(5000, 15000);
         WordPain = urand(6000, 12000);
         MindFlay = urand(2000, 10000);
-    }
-
-    void EnterEvadeMode()
-    {
-        if (CreatureGroup *formation = me->GetFormation())
-            formation->RespawnFormation(me);
-        ScriptedAI::EnterEvadeMode();
     }
 
     void EnterCombat(Unit*) { DoZoneInCombat(80.0f); }
@@ -505,13 +477,6 @@ struct mob_sunblade_scoutAI : public ScriptedAI
         SinisterStrike = urand(3000, 10000);
     }
 
-    void EnterEvadeMode()
-    {
-        if (CreatureGroup *formation = me->GetFormation())
-            formation->RespawnFormation(me);
-        ScriptedAI::EnterEvadeMode();
-    }
-
     bool ActivateProtector(Unit* who)
     {
         if(Unit* Protector = GetClosestCreatureWithEntry(me, 25507, 100, true, true))
@@ -617,13 +582,6 @@ struct mob_sunblade_slayerAI : public ScriptedAI
         DoCast(me, SPELL_DUAL_WIELD, true);
     }
 
-    void EnterEvadeMode()
-    {
-        if (CreatureGroup *formation = me->GetFormation())
-            formation->RespawnFormation(me);
-        ScriptedAI::EnterEvadeMode();
-    }
-
     void EnterCombat(Unit*) { DoZoneInCombat(80.0f); }
 
     void AttackStart(Unit* who)
@@ -699,13 +657,6 @@ struct mob_sunblade_vindicatorAI : public ScriptedAI
         BrutalStrike = urand(1000, 5000);
         Cleave = urand(4000, 9000);
         MortalStrike = urand(5000, 15000);
-    }
-
-    void EnterEvadeMode()
-    {
-        if (CreatureGroup *formation = me->GetFormation())
-            formation->RespawnFormation(me);
-        ScriptedAI::EnterEvadeMode();
     }
 
     void EnterCombat(Unit*) { DoZoneInCombat(80.0f); }
@@ -809,10 +760,9 @@ struct mob_shadowsword_assassinAI : public ScriptedAI
 
     void EnterEvadeMode()
     {
-        if (CreatureGroup *formation = me->GetFormation())
-            formation->RespawnFormation(me);
         if (pInstance->GetData(DATA_TRASH_GAUNTLET_EVENT) == IN_PROGRESS)
             pInstance->SetData(DATA_TRASH_GAUNTLET_EVENT, FAIL);
+
         ScriptedAI::EnterEvadeMode();
     }
 
@@ -839,8 +789,6 @@ struct mob_shadowsword_assassinAI : public ScriptedAI
 
     void MoveInLineOfSight(Unit *who)
     {
-        if(pInstance->GetData(DATA_FELMYST_EVENT) != DONE || who->GetTypeId() != TYPEID_PLAYER || me->getVictim() || me->IsInEvadeMode())
-            return;
         if(me->IsWithinDistInMap(who, 50) && me->IsWithinLOSInMap(who))
             DoRandomShadowstep(who);
     }
@@ -907,7 +855,7 @@ enum ShadowswordCommander
 struct mob_shadowsword_commanderAI : public ScriptedAI
 {
     mob_shadowsword_commanderAI(Creature *c) : ScriptedAI(c)
-    { 
+    {
         me->SetAggroRange(AGGRO_RANGE);
         pInstance = c->GetInstanceData();
         if(!TriggerGUID)
@@ -934,10 +882,9 @@ struct mob_shadowsword_commanderAI : public ScriptedAI
 
     void EnterEvadeMode()
     {
-        if (CreatureGroup *formation = me->GetFormation())
-            formation->RespawnFormation(me);
         if (pInstance->GetData(DATA_TRASH_GAUNTLET_EVENT) == IN_PROGRESS)
             pInstance->SetData(DATA_TRASH_GAUNTLET_EVENT, FAIL);
+
         ScriptedAI::EnterEvadeMode();
     }
 
@@ -945,14 +892,12 @@ struct mob_shadowsword_commanderAI : public ScriptedAI
     {
         if(pInstance->GetData(DATA_FELMYST_EVENT) != DONE)
             return;
-        DoZoneInCombat(80.0f); 
+        DoZoneInCombat(80.0f);
         DoCast(me, SPELL_BATTLE_SHOUT);
     }
 
     void MoveInLineOfSight(Unit* who)
     {
-        if(pInstance->GetData(DATA_FELMYST_EVENT) != DONE)
-            return;
         ScriptedAI::MoveInLineOfSight(who);
     }
 
@@ -1052,6 +997,8 @@ struct mob_shadowsword_deathbringerAI : public ScriptedAI
     {
         if (pInstance->GetData(DATA_TRASH_GAUNTLET_EVENT) == IN_PROGRESS)
             pInstance->SetData(DATA_TRASH_GAUNTLET_EVENT, FAIL);
+
+        ScriptedAI::EnterEvadeMode();
     }
 
     void EnterCombat(Unit*) { DoZoneInCombat(80.0f); }
@@ -1112,7 +1059,7 @@ struct mob_shadowsword_lifeshaperAI : public ScriptedAI
     mob_shadowsword_lifeshaperAI(Creature *c) : ScriptedAI(c)
     {
         me->SetAggroRange(AGGRO_RANGE);
-        pInstance = c->GetInstanceData(); 
+        pInstance = c->GetInstanceData();
     }
 
     ScriptedInstance* pInstance;
@@ -1138,27 +1085,23 @@ struct mob_shadowsword_lifeshaperAI : public ScriptedAI
 
     void EnterEvadeMode()
     {
-        if (CreatureGroup *formation = me->GetFormation())
-            formation->RespawnFormation(me);
         if (pInstance->GetData(DATA_TRASH_GAUNTLET_EVENT) == IN_PROGRESS)
             pInstance->SetData(DATA_TRASH_GAUNTLET_EVENT, FAIL);
+
         ScriptedAI::EnterEvadeMode();
     }
 
     void MoveInLineOfSight(Unit* who)
     {
-        if(pInstance->GetData(DATA_FELMYST_EVENT) != DONE)
-            return;
         ScriptedAI::MoveInLineOfSight(who);
     }
 
     void EnterCombat(Unit*)
     {
-        if(pInstance->GetData(DATA_FELMYST_EVENT) != DONE)
-            return;
         if(pInstance->GetData(DATA_TRASH_GAUNTLET_EVENT) == NOT_STARTED)
             pInstance->SetData(DATA_TRASH_GAUNTLET_EVENT, IN_PROGRESS);
-        DoZoneInCombat(80.0f); 
+
+        DoZoneInCombat(80.0f);
     }
 
     void UpdateAI(const uint32 diff)
@@ -1248,26 +1191,22 @@ struct mob_shadowsword_manafiendAI : public ScriptedAI
 
     void EnterEvadeMode()
     {
-        if (CreatureGroup *formation = me->GetFormation())
-            formation->RespawnFormation(me);
         if (pInstance->GetData(DATA_TRASH_GAUNTLET_EVENT) == IN_PROGRESS)
             pInstance->SetData(DATA_TRASH_GAUNTLET_EVENT, FAIL);
+
         ScriptedAI::EnterEvadeMode();
     }
 
     void MoveInLineOfSight(Unit* who)
     {
-        if(pInstance->GetData(DATA_FELMYST_EVENT) != DONE)
-            return;
         ScriptedAI::MoveInLineOfSight(who);
     }
 
     void EnterCombat(Unit*)
     {
-        if(pInstance->GetData(DATA_FELMYST_EVENT) != DONE)
-            return;
         if(pInstance->GetData(DATA_TRASH_GAUNTLET_EVENT) == NOT_STARTED)
             pInstance->SetData(DATA_TRASH_GAUNTLET_EVENT, IN_PROGRESS);
+
         DoZoneInCombat(80.0f);
     }
 
@@ -1322,7 +1261,7 @@ struct mob_shadowsword_soulbinderAI : public ScriptedAI
     mob_shadowsword_soulbinderAI(Creature *c) : ScriptedAI(c)
     {
         me->SetAggroRange(AGGRO_RANGE);
-        pInstance = c->GetInstanceData(); 
+        pInstance = c->GetInstanceData();
     }
 
     ScriptedInstance* pInstance;
@@ -1348,26 +1287,22 @@ struct mob_shadowsword_soulbinderAI : public ScriptedAI
 
     void EnterEvadeMode()
     {
-        if (CreatureGroup *formation = me->GetFormation())
-            formation->RespawnFormation(me);
         if (pInstance->GetData(DATA_TRASH_GAUNTLET_EVENT) == IN_PROGRESS)
             pInstance->SetData(DATA_TRASH_GAUNTLET_EVENT, FAIL);
+
         ScriptedAI::EnterEvadeMode();
     }
 
     void MoveInLineOfSight(Unit* who)
     {
-        if(pInstance->GetData(DATA_FELMYST_EVENT) != DONE)
-            return;
         ScriptedAI::MoveInLineOfSight(who);
     }
 
     void EnterCombat(Unit*)
     {
-        if(pInstance->GetData(DATA_FELMYST_EVENT) != DONE)
-            return;
         if(pInstance->GetData(DATA_TRASH_GAUNTLET_EVENT) == NOT_STARTED)
             pInstance->SetData(DATA_TRASH_GAUNTLET_EVENT, IN_PROGRESS);
+
         DoZoneInCombat(80.0f);
     }
 
@@ -1428,7 +1363,7 @@ struct mob_shadowsword_vanquisherAI : public ScriptedAI
     mob_shadowsword_vanquisherAI(Creature *c) : ScriptedAI(c)
     {
         me->SetAggroRange(AGGRO_RANGE);
-        pInstance = c->GetInstanceData(); 
+        pInstance = c->GetInstanceData();
     }
 
     ScriptedInstance* pInstance;
@@ -1452,26 +1387,22 @@ struct mob_shadowsword_vanquisherAI : public ScriptedAI
 
     void EnterEvadeMode()
     {
-        if (CreatureGroup *formation = me->GetFormation())
-            formation->RespawnFormation(me);
         if (pInstance->GetData(DATA_TRASH_GAUNTLET_EVENT) == IN_PROGRESS)
             pInstance->SetData(DATA_TRASH_GAUNTLET_EVENT, FAIL);
+
         ScriptedAI::EnterEvadeMode();
     }
 
     void MoveInLineOfSight(Unit* who)
     {
-        if(pInstance->GetData(DATA_FELMYST_EVENT) != DONE)
-            return;
         ScriptedAI::MoveInLineOfSight(who);
     }
 
     void EnterCombat(Unit*)
     {
-        if(pInstance->GetData(DATA_FELMYST_EVENT) != DONE)
-            return;
         if(pInstance->GetData(DATA_TRASH_GAUNTLET_EVENT) == NOT_STARTED)
             pInstance->SetData(DATA_TRASH_GAUNTLET_EVENT, IN_PROGRESS);
+
         DoZoneInCombat(80.0f);
     }
 
@@ -1509,7 +1440,7 @@ CreatureAI* GetAI_mob_shadowsword_vanquisher(Creature *_Creature)
 /****************
 * Volatile Fiend - id 25486
 
-  Immunities: 
+  Immunities:
 
 *****************/
 
@@ -1640,7 +1571,7 @@ CreatureAI* GetAI_mob_volatile_fiend(Creature *_Creature)
 struct npc_gauntlet_imp_triggerAI : public Scripted_NoMovementAI
 {
     npc_gauntlet_imp_triggerAI(Creature *c) : Scripted_NoMovementAI(c), summons(c)
-    { 
+    {
         me->SetAggroRange(1.0);
         pInstance = c->GetInstanceData();
         me->GetPosition(wLoc);

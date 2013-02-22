@@ -650,7 +650,7 @@ namespace Hellground
         public:
             explicit NearestHostileUnitInAttackDistanceCheck(Creature const* creature, float dist = 0, bool force = false) : m_creature(creature), m_force(force)
             {
-                m_range = (dist == 0 ? 9999 : dist);
+                m_range = (dist == 0 ? 80.0f : dist);
             }
             bool operator()(Unit* u)
             {
@@ -767,10 +767,10 @@ namespace Hellground
     class AnyPlayerInObjectRangeCheck
     {
     public:
-        AnyPlayerInObjectRangeCheck(WorldObject const* obj, float range) : i_obj(obj), i_range(range) {}
+        AnyPlayerInObjectRangeCheck(WorldObject const* obj, float range, bool alive = true) : i_obj(obj), i_range(range), i_alive(alive) {}
         bool operator()(Player* u)
         {
-            if (u->isAlive() && i_obj->IsWithinDistInMap(u, i_range))
+            if ((i_alive && u->isAlive() || !i_alive && !u->isAlive()) && i_obj->IsWithinDistInMap(u, i_range))
                 return true;
 
             return false;
@@ -778,6 +778,7 @@ namespace Hellground
     private:
         WorldObject const* i_obj;
         float i_range;
+        bool i_alive;
     };
 
     // Searchers used by ScriptedAI

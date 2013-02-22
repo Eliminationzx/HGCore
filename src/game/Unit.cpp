@@ -743,6 +743,25 @@ uint32 Unit::GetAurasAmountByMiscValue(AuraType auraType, uint32 misc)
     return count;
 }
 
+bool Unit::HasAuraByCasterWithFamilyFlags(uint64 pCaster, uint32 familyName,  uint64 familyFlags, const Aura * except) const
+{
+    const AuraMap & tmpMap = GetAuras();
+    SpellEntry const * tmpSpellInfo;
+    for (AuraMap::const_iterator itr = tmpMap.begin(); itr != tmpMap.end(); ++itr)
+    {
+        if ((!except || except != itr->second))
+        {
+            if (tmpSpellInfo = itr->second->GetSpellProto())
+            {
+                if (tmpSpellInfo->SpellFamilyName == familyName && tmpSpellInfo->SpellFamilyFlags & familyFlags && (itr->second->GetCasterGUID() == pCaster))
+                    return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 /* Called by DealDamage for auras that have a chance to be dispelled on damage taken. */
 void Unit::RemoveSpellbyDamageTaken(uint32 damage, uint32 spell)
 {
@@ -2401,7 +2420,7 @@ void Unit::RollMeleeHit(MeleeDamageLog *damageInfo, int32 crit_chance, int32 mis
 
     if (GetTypeId() == TYPEID_UNIT && ((Creature *)this)->GetCreatureInfo()->flags_extra & CREATURE_FLAG_EXTRA_NO_BLOCK_ON_ATTACK)
         block_chance = 0;
-    
+
     if (Player* player = const_cast<Player*>(ToPlayer()))
     {
         Item *tmpitem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_OFFHAND);
@@ -4125,6 +4144,25 @@ void Unit::RemoveAurasByCasterSpell(uint32 spellId, uint64 casterGUID)
             else
                 ++iter;
         }
+    }
+}
+
+void Unit::RemoveAurasWithFamilyFlagsAndTypeByCaster(uint32 familyName,  uint64 familyFlags, AuraType aurType, uint64 casterGUID)
+{
+    Unit::AuraList const& auras = GetAurasByType(aurType);
+    for (Unit::AuraList::const_iterator itr = auras.begin(); itr != auras.end();)
+    {
+        if ((*itr)->GetCasterGUID() == casterGUID)
+        {
+            SpellEntry const* itr_spell = (*itr)->GetSpellProto();
+            if (itr_spell && itr_spell->SpellFamilyName == familyName && (itr_spell->SpellFamilyFlags & familyFlags))
+            {
+                RemoveAurasDueToSpell(itr_spell->Id);
+                itr = auras.begin();
+                continue;
+            }
+        }
+        ++itr;
     }
 }
 
@@ -6979,6 +7017,18 @@ bool Unit::HandleProcTriggerSpell(Unit *pVictim, uint32 damage, Aura* triggeredB
             }
             else if (!(procFlags & (PROC_FLAG_TAKEN_MELEE_HIT | PROC_FLAG_TAKEN_MELEE_SPELL_HIT)))
                 return false;
+        }
+        // Trinket - Hand of Justice
+        case 15600:
+        {
+            float chance = 0;
+            chance = 6.02-0.067*getLevel();
+            if (!roll_chance_f(chance))
+                return false;
+
+            trigger_spell_id = 15601;
+
+            break;
         }
     }
 
@@ -10024,9 +10074,12 @@ Unit* Creature::SelectVictim()
             if (!HasAuraType(SPELL_AURA_MOD_TAUNT))
                 target = getThreatManager().getHostilTarget();
             else
-                target = getVictim();
+                return getVictim();
         }
     }
+
+    if (IsOutOfThreatArea(target))
+        target = NULL;
 
     if (target)
     {
@@ -10046,8 +10099,8 @@ Unit* Creature::SelectVictim()
     // search nearby enemy before enter evade mode
     if (HasReactState(REACT_AGGRESSIVE))
     {
-        target = SelectNearestTarget(45.0f);
-        if (target && !IsOutOfThreatArea(target))
+        target = SelectNearestTarget(25.0f);
+        if (target)
             return target;
     }
 
@@ -12678,7 +12731,7 @@ void Unit::RemoveCharmedOrPossessedBy(Unit *charmer)
             if (GetCharmInfo())
                 GetCharmInfo()->SetPetNumber(0, true);
             else
-                sLog.outLog(LOG_DEFAULT, "ERROR: Aura::HandleModCharm: target="UI64FMTD" with typeid=%d has a charm aura but no charm info!", GetGUID(), GetTypeId());
+                sLog.outLog(LOG_DEFAULT, "ERROR: Aura::HandleModCharm: target=" UI64FMTD " with typeid=%d has a charm aura but no charm info!", GetGUID(), GetTypeId());
         }
     }
 
