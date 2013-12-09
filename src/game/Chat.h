@@ -61,7 +61,7 @@ class ChatHandler
         }
 
         static char* LineFromMessage(char*& pos) { char* start = strtok(pos,"\n"); pos = NULL; return start; }
-        static std::string GetNameLink(std::string & name);
+        static std::string GetNameLink(const std::string & name);
 
         virtual const char *GetTrinityString(int32 entry) const;
 
@@ -91,7 +91,7 @@ class ChatHandler
 
         bool SendGMMail(const char* pName, const char* msgSubject, const char* msgText);
 
-        bool ExecuteCommandInTable(ChatCommand *table, const char* text, const std::string mastercommands);
+        bool ExecuteCommandInTable(ChatCommand *table, const char* text, const std::string& fullcommand);
         bool ShowHelpForCommand(ChatCommand *table, const char* cmd);
         bool ShowHelpForSubCommands(ChatCommand *table, char const* cmd, char const* subcmd);
 

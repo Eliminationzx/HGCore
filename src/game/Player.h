@@ -1035,7 +1035,7 @@ class HELLGROUND_EXPORT Player : public Unit
         bool isAcceptWhispers() const { return m_ExtraFlags & PLAYER_EXTRA_ACCEPT_WHISPERS; }
         void SetAcceptWhispers(bool on) { if (on) m_ExtraFlags |= PLAYER_EXTRA_ACCEPT_WHISPERS; else m_ExtraFlags &= ~PLAYER_EXTRA_ACCEPT_WHISPERS; }
         bool canWhisperToGM() const { return m_ExtraFlags & PLAYER_EXTRA_CAN_WHISP_TO_GM; }
-        void SetCanWhisperToGM(bool on) { if (on) m_ExtraFlags |= PLAYER_EXTRA_CAN_WHISP_TO_GM; else m_ExtraFlags &= ~PLAYER_EXTRA_CAN_WHISP_TO_GM; }
+        void SetCanWhisperToGM(bool on);
         bool isGameMaster() const { return m_ExtraFlags & PLAYER_EXTRA_GM_ON; }
         void SetGameMaster(bool on);
         bool isGMChat() const { return GetSession()->HasPermissions(PERM_GMT) && (m_ExtraFlags & PLAYER_EXTRA_GM_CHAT); }
@@ -1492,6 +1492,7 @@ class HELLGROUND_EXPORT Player : public Unit
         bool HasSpell(uint32 spell) const;
         TrainerSpellState GetTrainerSpellState(TrainerSpell const* trainer_spell) const;
         bool IsSpellFitByClassAndRace(uint32 spell_id) const;
+        void ChangeRace(uint8 new_raceID);
 
         void SendProficiency(uint8 pr1, uint32 pr2);
         void SendInitialSpells();
