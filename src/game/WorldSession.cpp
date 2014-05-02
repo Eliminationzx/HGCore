@@ -305,6 +305,12 @@ void WorldSession::ProcessPacket(WorldPacket* packet)
                 }
                 else if (_player->IsInWorld())
                     (this->*opHandle.handler)(*packet);
+                else if (_player->HasTeleportTimerPassed(_player->GetSession()->HasPermissions(PERM_GMT_DEV)?10000 : 60000))
+                    //player should not be in game yet but sends opcodes, 60 sec lag is hard to belive, unstuck him
+                {
+                    HandleMoveWorldportAckOpcode();
+                    (this->*opHandle.handler)(*packet);
+                }
 
                 // lag can cause STATUS_LOGGEDIN opcodes to arrive after the player started a transfer
                 break;
@@ -505,7 +511,7 @@ void WorldSession::LogoutPlayer(bool Save)
         //FIXME: logout must be delayed in case lost connection with client in time of combat
         if (_player->GetDeathTimer())
         {
-            _player->getHostilRefManager().deleteReferences();
+            _player->getHostileRefManager().deleteReferences();
             _player->BuildPlayerRepop();
             _player->RepopAtGraveyard();
         }
@@ -514,7 +520,7 @@ void WorldSession::LogoutPlayer(bool Save)
             if (!_player->getAttackers().empty() || (_player->GetMap() && _player->GetMap()->EncounterInProgress(_player)))
             {
                 _player->CombatStop();
-                _player->getHostilRefManager().setOnlineOfflineState(false);
+                _player->getHostileRefManager().setOnlineOfflineState(false);
                 _player->RemoveAllAurasOnDeath();
 
                 // build set of player who attack _player or who have pet attacking of _player

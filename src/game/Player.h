@@ -62,6 +62,14 @@ typedef std::deque<Mail*> PlayerMails;
 
 #define PLAYER_MAX_SKILLS       127
 
+enum AnticheatChecks
+{
+    ANTICHEAT_CHECK_FLYHACK,
+    ANTICHEAT_CHECK_WATERWALKHACK,
+
+    ANTICHEAT_CHECK_MAX
+};
+
 // Note: SPELLMOD_* values is aura types in fact
 enum SpellModType
 {
@@ -1848,6 +1856,7 @@ class HELLGROUND_EXPORT Player : public Unit
         /*********************************************************/
         /***                 ANTICHEAT SYSTEM                  ***/
         /*********************************************************/
+        void CumulativeACReport(AnticheatChecks check);
         uint32 m_AC_timer;
         uint32 m_AC_NoFall_count;
 
@@ -2103,6 +2112,7 @@ class HELLGROUND_EXPORT Player : public Unit
 
         void BuildTeleportAckMsg(WorldPacket & data, float x, float y, float z, float ang) const;
 
+        bool isInSanctuary();
         bool isMoving() const { return HasUnitMovementFlag(MOVEFLAG_MOVING); }
         bool isTurning() const { return HasUnitMovementFlag(MOVEFLAG_TURNING); }
         bool isMovingOrTurning() const { return HasUnitMovementFlag(MOVEFLAG_TURNING | MOVEFLAG_MOVING); }
@@ -2534,13 +2544,17 @@ class HELLGROUND_EXPORT Player : public Unit
         
         void AddConsecutiveKill(uint64 guid);
         uint32 GetConsecutiveKillsCount(uint64 guid);
-
         void UpdateConsecutiveKills();
-
         ConsecutiveKillsMap m_consecutiveKills;
+
+        time_t m_AC_cumulative_timer[ANTICHEAT_CHECK_MAX];
+        uint32 m_AC_cumulative_count[ANTICHEAT_CHECK_MAX];
 
         // Current teleport data
         WorldLocation m_teleport_dest;
+        void StartTeleportTimer() {m_teleportStartTime = time(NULL);}
+        bool HasTeleportTimerPassed(uint64 diff) {return m_teleportStartTime + diff < time(NULL);}
+        uint64 m_teleportStartTime;
 
         // Temporary removed pet cache
         uint32 m_temporaryUnsummonedPetNumber;

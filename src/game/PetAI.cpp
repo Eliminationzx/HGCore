@@ -70,7 +70,9 @@ bool PetAI::targetHasInterruptableAura(Unit *target) const
 bool PetAI::_needToStop() const
 {
     // This is needed for charmed creatures, as once their target was reset other effects can trigger threat
-    if (me->isCharmed() && me->getVictim() == me->GetCharmer())
+    // also pet should stop attacking if his target of his owner is in sanctuary (applies only to player and player-pets targets)
+    if ((me->isCharmed() && me->getVictim() == me->GetCharmer()) ||
+        (me->GetOwner() && me->GetOwner()->isInSanctuary() &&  me->getVictim()->GetCharmerOrOwnerPlayerOrPlayerItself()))
         return true;
 
     return targetHasInterruptableAura(me->getVictim()) || !me->canAttack(me->getVictim());
@@ -84,7 +86,7 @@ void PetAI::_stopAttack()
 
         me->GetMotionMaster()->MoveIdle();
         me->CombatStop();
-        me->getHostilRefManager().deleteReferences();
+        me->getHostileRefManager().deleteReferences();
 
         return;
     }
@@ -215,6 +217,22 @@ void PetAI::AutocastPreparedSpells()
         m_targetSpellStore.erase(m_targetSpellStore.begin());
         delete temp;
     }
+}
+
+void PetAI::MovementInform(uint32 type, uint32 data)
+{
+    if (type != CHASE_MOTION_TYPE || data != 2) // target reached only
+        return;
+
+    if (Unit *target = me->getVictim())
+        if (target->getVictim() && target->getVictim() != me && target->isInFront(me, 7.0f, M_PI))
+        {
+            float x, y, z;
+            target->GetGroundPointAroundUnit(x, y, z, target->GetObjectSize(), M_PI);
+
+            if (abs(z - me->GetPositionZ()) <= NOMINAL_MELEE_RANGE) // height difference check
+                me->GetMotionMaster()->MovePoint(0, x, y, z);
+        }
 }
 
 void PetAI::UpdateAI(const uint32 diff)

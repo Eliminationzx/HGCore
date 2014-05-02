@@ -273,7 +273,7 @@ ChatCommand * ChatHandler::getCommandTable()
         { "getinstdata",    PERM_ADM,       PERM_CONSOLE, false,  &ChatHandler::HandleDebugGetInstanceDataCommand,    "", NULL },
         { "getinstdata64",  PERM_ADM,       PERM_CONSOLE, false,  &ChatHandler::HandleDebugGetInstanceData64Command,  "", NULL },
         { "getvalue",       PERM_ADM,       PERM_CONSOLE, false,  &ChatHandler::HandleDebugGetValue,                  "", NULL },
-        { "hostilelist",    PERM_GMT_DEV,   PERM_CONSOLE, false,  &ChatHandler::HandleDebugHostilRefList,             "", NULL },
+        { "hostilelist",    PERM_GMT_DEV,   PERM_CONSOLE, false,  &ChatHandler::HandleDebugHostileRefList,            "", NULL },
         { "lootrecipient",  PERM_GMT_DEV,   PERM_CONSOLE, false,  &ChatHandler::HandleDebugGetLootRecipient,          "", NULL },
         { "Mod32Value",     PERM_ADM,       PERM_CONSOLE, false,  &ChatHandler::HandleDebugMod32Value,                "", NULL },
         { "play",           PERM_DEVELOPER, PERM_CONSOLE, false,  NULL,                                               "", debugPlayCommandTable },
@@ -989,9 +989,10 @@ bool ChatHandler::ExecuteCommandInTable(ChatCommand *table, const char* text, st
 
         SetSentErrorMessage(false);
         // table[i].Name == "" is special case: send original command to handler
+        std::string args = strlen(table[i].Name )!=0 ? std::string(" ") + text : oldtext;
         if ((this->*(table[i].Handler))(strlen(table[i].Name)!=0 ? text : oldtext))
         {
-            if (m_session && (m_session->GetPermissions() & sWorld.getConfig(CONFIG_COMMAND_LOG_PERMISSION)) && table[i].Name != "password")
+        if (m_session && (m_session->GetPermissions() & sWorld.getConfig(CONFIG_COMMAND_LOG_PERMISSION)) && table[i].Name != "password")
             {
                 Player* p = m_session->GetPlayer();
                 uint64 sel_guid = p->GetSelection();
@@ -1005,7 +1006,7 @@ bool ChatHandler::ExecuteCommandInTable(ChatCommand *table, const char* text, st
                     sprintf(sel_string,"NONE");
 
                 sLog.outCommand(m_session->GetAccountId(),"Command: %s%s [Player: %s (Account: %u) X: %f Y: %f Z: %f Map: %u Selected: %s]",
-                    fullcmd.c_str(),(strlen(table[i].Name)!=0 ? (std::string(" ") + text).c_str() : oldtext),
+                    fullcmd.c_str(),args .c_str(),
                     p->GetName(),m_session->GetAccountId(),p->GetPositionX(),p->GetPositionY(),p->GetPositionZ(),p->GetMapId(),
                     sel_string);
             }

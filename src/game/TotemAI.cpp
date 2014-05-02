@@ -83,8 +83,8 @@ void TotemAI::UpdateAI(const uint32 /*diff*/)
 
     // Search victim if no, not attackable, or out of range, or friendly (possible in case duel end)
     if (!victim || (!SpellMgr::SpellIgnoreLOS(spellInfo, 0) && !i_totem.IsWithinLOSInMap(victim)) ||
-        !victim->isTargetableForAttack() || !i_totem.IsWithinDistInMap(victim, max_range) ||
-        (i_totem.IsFriendlyTo(victim) && victim != &i_totem) || !victim->isVisibleForOrDetect(&i_totem, &i_totem, false))
+       !victim->isTargetableForAttack() || !i_totem.IsWithinDistInMap(victim, max_range) ||  
+       (i_totem.IsFriendlyTo(victim) && victim != &i_totem) || !victim->isVisibleForOrDetect(&i_totem, &i_totem, false))
     {
         victim = NULL;
 
@@ -97,6 +97,9 @@ void TotemAI::UpdateAI(const uint32 /*diff*/)
     // If have target
     if (victim)
     {
+    //this should prevent target-type totems from attacking from unattackable zones and attacking while being unattackable
+        if ((i_totem.isInSanctuary() || victim->isInSanctuary()) && victim->GetCharmerOrOwnerPlayerOrPlayerItself())
+            return;
         // remember
         i_victimGuid = victim->GetGUID();
 

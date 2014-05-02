@@ -261,7 +261,7 @@ bool CastSpellEvent::Execute(uint64 /*e_time*/, uint32 /*p_time*/)
 
 Unit::Unit() :
     WorldObject(), i_motionMaster(this), movespline(new Movement::MoveSpline()),
-    _threatManager(this), _hostilRefManager(this), m_stateMgr(this),
+    _threatManager(this), _hostileRefManager(this), m_stateMgr(this),
     IsAIEnabled(false), NeedChangeAI(false), i_AI(NULL), i_disabledAI(NULL),
     m_procDeep(0), m_AI_locked(false), m_removedAurasCount(0)
 {
@@ -450,7 +450,7 @@ void Unit::Update(uint32 update_diff, uint32 p_time)
     // update combat timer only for players and pets
     if (isInCombat() && isCharmedOwnedByPlayerOrPlayer())
     {
-        if (getHostilRefManager().isEmpty())
+        if (getHostileRefManager().isEmpty())
         {
             // m_CombatTimer set at aura start and it will be freeze until aura removing
             if (m_CombatTimer <= update_diff)
@@ -832,12 +832,9 @@ uint32 Unit::DealDamage(DamageLog *damageInfo, DamageEffectType damagetype, cons
         return 0;
 
     //You don't lose health from damage taken from another player while in a sanctuary
-    if (pVictim != this && isCharmedOwnedByPlayerOrPlayer() && pVictim->isCharmedOwnedByPlayerOrPlayer() && pVictim->GetOwner() != this)
-    {
-        const AreaTableEntry *area = GetAreaEntryByAreaID(pVictim->GetAreaId());
-        if (area && area->flags & AREA_FLAG_SANCTUARY)       //sanctuary
-            return 0;
-    }
+    if (pVictim != this && isCharmedOwnedByPlayerOrPlayer() && pVictim->isCharmedOwnedByPlayerOrPlayer() &&
+        pVictim->GetOwner() != this && pVictim->isInSanctuary())
+        return 0;
 
     // Do not deal damage from AoE spells when target is immune to it
     if (!pVictim->isAttackableByAOE() && spellProto && SpellMgr::IsAreaOfEffectSpell(spellProto))
@@ -1515,17 +1512,9 @@ void Unit::DealSpellDamage(SpellDamageLog *damageInfo, bool durabilityLoss)
 
     //You don't lose health from damage taken from another player while in a sanctuary
     //You still see it in the combat log though
-    if (pVictim != this && GetTypeId() == TYPEID_PLAYER && pVictim->GetTypeId() == TYPEID_PLAYER)
-    {
-        const AreaTableEntry *area = GetAreaEntryByAreaID(((Player*)pVictim)->GetCachedArea());
-        if (area && area->flags & 0x800)                     //sanctuary
-            return;
-
-        // prevent cross-zone attack: caster in sanctuary, victim not
-        area = GetAreaEntryByAreaID(((Player*)this)->GetCachedArea());
-        if (area && area->flags & 0x800)
-            return;
-    }
+    if (pVictim != this && GetTypeId() == TYPEID_PLAYER && pVictim->GetTypeId() == TYPEID_PLAYER &&
+        (pVictim->isInSanctuary() || isInSanctuary()))
+        return;
 
     // update at damage Judgement aura duration that applied by attacker at victim
     if (damageInfo->damage && spellProto->Id == 35395)
@@ -1642,12 +1631,8 @@ void Unit::DealMeleeDamage(MeleeDamageLog *damageInfo, bool durabilityLoss)
 
     //You don't lose health from damage taken from another player while in a sanctuary
     //You still see it in the combat log though
-    if (pVictim != this && GetTypeId() == TYPEID_PLAYER && pVictim->GetTypeId() == TYPEID_PLAYER)
-    {
-        const AreaTableEntry *area = GetAreaEntryByAreaID(((Player*)pVictim)->GetCachedArea());
-        if (area && area->flags & 0x800)                     //sanctuary
-            return;
-    }
+    if (pVictim != this && GetTypeId() == TYPEID_PLAYER && pVictim->GetTypeId() == TYPEID_PLAYER && pVictim->isInSanctuary())
+        return;
 
     // Hmmmm dont like this emotes cloent must by self do all animations
     if (damageInfo->hitInfo & HITINFO_CRITICALHIT)
@@ -8939,14 +8924,15 @@ bool Unit::IsImmunedToSpell(SpellEntry const* spellInfo, bool useCharges)
     if (!spellInfo)
         return false;
 
-    // If Spel has this flag cannot be resisted/immuned/etc
+    // If spell has this flag, it cannot be resisted/immuned/etc
     if (spellInfo->Attributes & SPELL_ATTR_UNAFFECTED_BY_INVULNERABILITY)
         return false;
 
-    SpellImmuneList const& dispelList = m_spellImmune[IMMUNITY_DISPEL];
-    for (SpellImmuneList::const_iterator itr = dispelList.begin(); itr != dispelList.end(); ++itr)
-        if (itr->type == spellInfo->Dispel)
-            return true;
+    SpellImmuneList const& stateList = m_spellImmune[IMMUNITY_STATE];
+    for (SpellImmuneList::const_iterator itr = stateList.begin(); itr != stateList.end(); ++itr)
+        for (uint32 i = 0; i < 3; ++i)
+            if (itr->type == spellInfo->EffectApplyAuraName[i])
+                return true;
 
     if (!(spellInfo->AttributesEx & SPELL_ATTR_EX_UNAFFECTED_BY_SCHOOL_IMMUNE) &&         // unaffected by school immunity
         !(spellInfo->AttributesEx & SPELL_ATTR_EX_DISPEL_AURAS_ON_IMMUNITY)               // can remove immune (by dispell or immune it)
@@ -8959,23 +8945,20 @@ bool Unit::IsImmunedToSpell(SpellEntry const* spellInfo, bool useCharges)
                 return true;
     }
 
+    SpellImmuneList const& dispelList = m_spellImmune[IMMUNITY_DISPEL];
+    for (SpellImmuneList::const_iterator itr = dispelList.begin(); itr != dispelList.end(); ++itr)
+        if (itr->type == spellInfo->Dispel)
+            return true;
+
     SpellImmuneList const& mechanicList = m_spellImmune[IMMUNITY_MECHANIC];
     for (SpellImmuneList::const_iterator itr = mechanicList.begin(); itr != mechanicList.end(); ++itr)
-    {
         if (itr->type == spellInfo->Mechanic)
-        {
             return true;
-        }
-    }
 
     SpellImmuneList const& idList = m_spellImmune[IMMUNITY_ID];
     for (SpellImmuneList::const_iterator itr = idList.begin(); itr != idList.end(); ++itr)
-    {
         if (itr->type == spellInfo->Id)
-        {
             return true;
-        }
-    }
 
     return false;
 }
@@ -9988,7 +9971,7 @@ void Unit::setDeathState(DeathState s)
     {
         CombatStop();
         DeleteThreatList();
-        getHostilRefManager().deleteReferences();
+        getHostileRefManager().deleteReferences();
         ClearComboPointHolders();                           // any combo points pointed to unit lost at it death
 
         if (IsNonMeleeSpellCasted(false))
@@ -10918,7 +10901,7 @@ void Unit::RemoveFromWorld()
     // cleanup
     if (IsInWorld())
     {
-        getHostilRefManager().deleteReferences();
+        getHostileRefManager().deleteReferences();
 
         RemoveBindSightAuras();
         RemoveNotOwnSingleTargetAuras();
@@ -10946,7 +10929,7 @@ void Unit::CleanupsBeforeDelete()
         CombatStop();
         ClearComboPointHolders();
         DeleteThreatList();
-        getHostilRefManager().setOnlineOfflineState(false);
+        getHostileRefManager().setOnlineOfflineState(false);
         RemoveAllGameObjects();
         RemoveAllDynObjects();
 
@@ -12778,7 +12761,7 @@ void Unit::RemoveCharmedOrPossessedBy(Unit *charmer)
 
     CastStop();
     CombatStop(); //TODO: CombatStop(true) may cause crash (interrupt spells)
-    getHostilRefManager().deleteReferences();
+    getHostileRefManager().deleteReferences();
     DeleteThreatList();
     SetCharmerGUID(0);
     RestoreFaction();
@@ -13325,4 +13308,13 @@ void Unit::SetRooted(bool apply)
         GetUnitStateMgr().PushAction(UNIT_ACTION_ROOT);
     else
         GetUnitStateMgr().DropAction(UNIT_ACTION_ROOT);
+}
+
+bool Unit::isInSanctuary()
+{
+    const AreaTableEntry *area = GetAreaEntryByAreaID(GetAreaId());
+    if (area && area->flags & AREA_FLAG_SANCTUARY)
+        return true;
+
+    return false;
 }

@@ -3396,7 +3396,7 @@ void Spell::EffectHealPct(uint32 /*i*/)
         caster->SendHealSpellLog(unitTarget, GetSpellEntry()->Id, addhealth, false);
 
         int32 gain = unitTarget->ModifyHealth(int32(addhealth));
-        unitTarget->getHostilRefManager().threatAssist(m_caster, float(gain) * 0.5f, GetSpellEntry());
+        unitTarget->getHostileRefManager().threatAssist(m_caster, float(gain) * 0.5f, GetSpellEntry());
 
         if (caster->GetTypeId()==TYPEID_PLAYER)
             if (BattleGround *bg = ((Player*)caster)->GetBattleGround())
@@ -3454,7 +3454,7 @@ void Spell::EffectHealthLeech(uint32 i)
         new_damage = m_caster->SpellHealingBonus(GetSpellEntry(), new_damage, HEAL, m_caster);
 
         int32 gain = m_caster->ModifyHealth(new_damage);
-        m_caster->getHostilRefManager().threatAssist(m_caster, gain * 0.5f, GetSpellEntry());
+        m_caster->getHostileRefManager().threatAssist(m_caster, gain * 0.5f, GetSpellEntry());
 
         m_caster->SendHealSpellLog(m_caster, GetSpellEntry()->Id, uint32(new_damage));
     }
@@ -3666,7 +3666,7 @@ void Spell::EffectEnergize(uint32 i)
 
     //No threat from life tap
     if (GetSpellEntry()->Id != 31818)
-        unitTarget->getHostilRefManager().threatAssist(m_caster, float(gain) * 0.5f, GetSpellEntry());
+        unitTarget->getHostileRefManager().threatAssist(m_caster, float(gain) * 0.5f, GetSpellEntry());
 
     m_caster->SendEnergizeSpellLog(unitTarget, GetSpellEntry()->Id, damage, power);
 
@@ -3731,7 +3731,7 @@ void Spell::EffectEnergisePct(uint32 i)
 
     uint32 gain = damage * maxPower / 100;
     int32 realGain = unitTarget->ModifyPower(power, gain);
-    unitTarget->getHostilRefManager().threatAssist(m_caster, float(realGain) * 0.5f, GetSpellEntry());
+    unitTarget->getHostileRefManager().threatAssist(m_caster, float(realGain) * 0.5f, GetSpellEntry());
     m_caster->SendEnergizeSpellLog(unitTarget, GetSpellEntry()->Id, realGain, power);
 }
 
@@ -4396,28 +4396,43 @@ void Spell::EffectSummonGuardian(uint32 i)
     Player *caster = NULL;
     if (m_originalCaster)
     {
-        if (m_originalCaster->GetTypeId() == TYPEID_PLAYER)
-            caster = (Player*)m_originalCaster;
-        else if (((Creature*)m_originalCaster)->isTotem())
-        {
-            if (((Creature*)m_originalCaster)->GetEntry() == 15439 || ((Creature*)m_originalCaster)->GetEntry() == 15430)
-            {
-                float px, py, pz;
-                m_caster->GetNearPoint(px,py,pz,m_caster->GetObjectSize());
-                if (caster = m_originalCaster->GetCharmerOrOwnerPlayerOrPlayerItself())
+       if (m_originalCaster->GetTypeId() == TYPEID_PLAYER)
+          caster = (Player*)m_originalCaster;
+       else if (((Creature*)m_originalCaster)->isTotem())
+       {
+          if (((Creature*)m_originalCaster)->GetEntry() == 15439 || ((Creature*)m_originalCaster)->GetEntry() == 15430)
+          {
+             float px, py, pz;
+             m_caster->GetNearPoint(px,py,pz,m_caster->GetObjectSize());
+             if (caster = m_originalCaster->GetCharmerOrOwnerPlayerOrPlayerItself())
                 if (Pet *spawnCreature = caster->SummonPet(GetSpellEntry()->EffectMiscValue[i], px, py, pz, m_caster->GetOrientation(), GUARDIAN_PET, duration))
                 {
-                    spawnCreature->SetUInt32Value(UNIT_FIELD_PET_NAME_TIMESTAMP,0);
-                    spawnCreature->SetUInt32Value(UNIT_CREATED_BY_SPELL, GetSpellEntry()->Id);
-                    spawnCreature->SetFlag(UNIT_FIELD_FLAGS,UNIT_FLAG_PVP_ATTACKABLE);
-                    spawnCreature->SetOwnerGUID(m_caster->GetGUID());
-                    spawnCreature->SetReactState(REACT_AGGRESSIVE);
-                    return;
+                   spawnCreature->SetUInt32Value(UNIT_FIELD_PET_NAME_TIMESTAMP,0);
+                   spawnCreature->SetUInt32Value(UNIT_CREATED_BY_SPELL, GetSpellEntry()->Id);
+                   spawnCreature->SetFlag(UNIT_FIELD_FLAGS,UNIT_FLAG_PVP_ATTACKABLE);
+                   spawnCreature->SetOwnerGUID(m_caster->GetGUID());
+                   spawnCreature->SetReactState(REACT_DEFENSIVE);
+
+                   float healthfactor = (frand(0.15, 0.30));
+                   float manafactor = (frand(0.2, 0.8));
+                   spawnCreature->SetMaxHealth(spawnCreature->GetMaxHealth() + caster->GetHealthBonusFromStamina() * healthfactor);
+                   spawnCreature->SetHealth(spawnCreature->GetMaxHealth() + caster->GetHealthBonusFromStamina() * healthfactor);
+                   if(spawnCreature->GetEntry() == 15438)
+                   {
+                      spawnCreature->SetMaxPower(POWER_MANA, (spawnCreature->GetMaxPower(POWER_MANA) + caster->GetManaBonusFromIntellect() * manafactor));
+                      spawnCreature->SetPower(POWER_MANA,(spawnCreature->GetMaxPower(POWER_MANA) + caster->GetManaBonusFromIntellect() * manafactor));
+                   }
+                   //Precise values are impossible to find. This values (+ 10-30%) are the conclusion of all available proofs, lovered by 10%.
+                   //After checking the impact on the game if may be lowered to 10%.
+                   //Mana bonus must be much lover, due to conclusion of spells costs.
+                   //Bonus spell damage is not confirmed, so it's NOT implemented.
+
+                   return;
                 }
-            }
-            else
-                caster = m_originalCaster->GetCharmerOrOwnerPlayerOrPlayerItself();
-        }
+          }
+          else
+             caster = m_originalCaster->GetCharmerOrOwnerPlayerOrPlayerItself();
+       }
     }
 
     if (!caster)
@@ -4970,7 +4985,7 @@ void Spell::EffectTaunt(uint32 /*i*/)
 
     //Set aggro victim to caster
     if (!unitTarget->getThreatManager().getOnlineContainer().empty())
-        if (HostilReference* forcedVictim = unitTarget->getThreatManager().getOnlineContainer().getReferenceByTarget(m_caster))
+        if (HostileReference* forcedVictim = unitTarget->getThreatManager().getOnlineContainer().getReferenceByTarget(m_caster))
             unitTarget->getThreatManager().setCurrentVictim(forcedVictim);
 
     if (((Creature*)unitTarget)->IsAIEnabled)
@@ -5662,12 +5677,12 @@ void Spell::EffectScriptEffect(uint32 effIndex)
             uint32 GravityLapseChannel = 44251; // visual self-casted, triggers AoE beams
             uint8 counter = 0;
 
-            std::list<HostilReference*> PlayerList = m_caster->getThreatManager().getThreatList();
+            std::list<HostileReference*> PlayerList = m_caster->getThreatManager().getThreatList();
 
             if(PlayerList.empty() && m_caster->isInCombat())
                 ((Creature*)m_caster)->AI()->EnterEvadeMode();
 
-            for(std::list<HostilReference*>::iterator i = PlayerList.begin(); i != PlayerList.end(); ++i)
+            for(std::list<HostileReference*>::iterator i = PlayerList.begin(); i != PlayerList.end(); ++i)
             {
                 Unit* pUnit = m_caster->GetMap()->GetUnit((*i)->getUnitGuid());
                 if(!pUnit)
@@ -6648,7 +6663,7 @@ void Spell::EffectSanctuary(uint32 /*i*/)
     }
 
     unitTarget->CombatStop();
-    unitTarget->getHostilRefManager().deleteReferences();   // stop all fighting
+    unitTarget->getHostileRefManager().deleteReferences();  // stop all fighting
     // Vanish allows to remove all threat and cast regular stealth so other spells can be used
     if (GetSpellEntry()->SpellFamilyName == SPELLFAMILY_ROGUE && (GetSpellEntry()->SpellFamilyFlags & SPELLFAMILYFLAG_ROGUE_VANISH))
     {

@@ -272,6 +272,11 @@ Player::Player (WorldSession *session): Unit(), m_reputationMgr(this), m_camera(
 
     m_AC_timer = 0;
     m_AC_NoFall_count = 0;
+    for (uint8 i = 0 ; i< ANTICHEAT_CHECK_MAX;i++)
+    {
+        m_AC_cumulative_count[i] = 0;
+        m_AC_cumulative_timer[i] = time(NULL);
+    }
 
     m_speakTime = 0;
     m_speakCount = 0;
@@ -462,6 +467,8 @@ Player::Player (WorldSession *session): Unit(), m_reputationMgr(this), m_camera(
     positionStatus.Reset(0);
 
     m_GrantableLevelsCount = 0;
+
+    StartTeleportTimer();
 }
 
 Player::~Player ()
@@ -1862,6 +1869,7 @@ bool Player::TeleportTo(uint32 mapid, float x, float y, float z, float orientati
             SetSelection(0);
             CombatStop();
             ResetContestedPvP();
+            StartTeleportTimer();
 
             // remove player from battleground on far teleport (when changing maps)
             if (BattleGround const* bg = GetBattleGround())
@@ -2297,7 +2305,7 @@ void Player::SetInWater(bool apply)
     // remove auras that need water/land
     RemoveAurasWithInterruptFlags(apply ? AURA_INTERRUPT_FLAG_NOT_ABOVEWATER : AURA_INTERRUPT_FLAG_NOT_UNDERWATER);
 
-    getHostilRefManager().updateThreatTables();
+    getHostileRefManager().updateThreatTables();
 }
 
 void Player::SetGameMaster(bool on)
@@ -2327,7 +2335,7 @@ void Player::SetGameMaster(bool on)
         UpdateArea(m_areaUpdateId);
     }
 
-    getHostilRefManager().setOnlineOfflineState(!on);
+    getHostileRefManager().setOnlineOfflineState(!on);
     UpdateVisibilityAndView();
 }
 
@@ -16602,7 +16610,7 @@ void Player::_SaveInventory()
 
                 AccountsDatabase.BeginTransaction();
 
-                SqlStatement stmt = AccountsDatabase.CreateStatement(insertBan, "INSERT INTO account_panishment VALUES (?, ?, UNIX_TIMESTAMP(), UNIX_TIMESTAMP(), '[CONSOLE]', 'With love: cheater -.-', 1)");
+                SqlStatement stmt = AccountsDatabase.CreateStatement(insertBan, "INSERT INTO account_punishment VALUES (?, ?, UNIX_TIMESTAMP(), UNIX_TIMESTAMP(), '[CONSOLE]', 'With love: cheater -.-', 1)");
                 stmt.PExecute(GetSession()->GetAccountId(), uint32(PUNISHMENT_BAN));
 
                 if (!GetSession()->IsAccountFlagged(ACC_SPECIAL_LOG))
@@ -18074,7 +18082,7 @@ void Player::CleanupAfterTaxiFlight()
     m_taxi.ClearTaxiDestinations();        // not destinations, clear source node
     Unmount();
     RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_DISABLE_MOVE | UNIT_FLAG_TAXI_FLIGHT);
-    getHostilRefManager().setOnlineOfflineState(true);
+    getHostileRefManager().setOnlineOfflineState(true);
 }
 
 void Player::ProhibitSpellSchool(SpellSchoolMask idSchoolMask, uint32 unTimeMs)
@@ -21076,8 +21084,9 @@ void Player::ChangeGrantableLevels(uint8 increase)
 {
     if (increase)
     {
-        if (m_GrantableLevelsCount <= uint32(sWorld.getConfig(CONFIG_UINT32_RAF_MAXGRANTLEVEL) * sWorld.getConfig(CONFIG_FLOAT_RATE_RAF_LEVELPERLEVEL)))
-            m_GrantableLevelsCount = increase;
+        while (increase-- > 0)
+            if (m_GrantableLevelsCount < uint32(sWorld.getConfig(CONFIG_UINT32_RAF_MAXGRANTLEVEL) * sWorld.getConfig(CONFIG_FLOAT_RATE_RAF_LEVELPERLEVEL)))
+                m_GrantableLevelsCount += 1;
     }
     else
     {
@@ -21192,7 +21201,7 @@ void Player::ChangeRace(uint8 new_race)
         {1132,5665,5668,1132,18796,18797,18798},
         {5864,5872,5873,5864,18785,18786,18787},
         {8629,8631,8632,8629,18766,18767,18902},
-        {13331,13332,13333,13331,13334,18791,0},
+        {13331,13332,13333,13331,13334,18791,13334},
         {15277,15290,15277,15290,18793,18794,18795},
         {8595,8563,13321,13322,18772,18773,18774},
         {8588,8591,8592,8588,18788,18789,18790},
@@ -21201,21 +21210,32 @@ void Player::ChangeRace(uint8 new_race)
         {28481,29743,29744,28481,29745,29746,29747}
     };
 
-    sLog.outLog(LOG_CHAR,"Starting race change for player %s [%u]",GetName(),GetGUIDLow());
+    sLog.outLog(LOG_RACE_CHANGE,"[%u] Starting race change for player %s from %u to %u",GetGUIDLow(),GetName(),getRace(),new_race);
     Races old_race = Races(getRace());
 
-    if (bool((1 << new_race) & 0x44D) != bool((1 << old_race) & 0x2B2))
+    if (bool((1 << new_race) & 0x89A) != bool((1 << old_race) & 0x89A))
     {
-        sLog.outLog(LOG_CHAR,"Race change: invalid race change, trans-faction NYI");
+        sLog.outLog(LOG_RACE_CHANGE,"[%u] Invalid race change, trans-faction NYI",GetGUIDLow());
         return;
     }
 
     const PlayerInfo* new_info = sObjectMgr.GetPlayerInfo(new_race,getClass());
     if (!new_info)
     {
-        sLog.outLog(LOG_CHAR,"Race change: invalid race/class pair");
+        sLog.outLog(LOG_RACE_CHANGE,"[%u] Invalid race/class pair: %u / %u",GetGUIDLow(),new_race,getClass());
         return;
     }
+
+    QueryResultAutoPtr result = GameDataDatabase.PQuery(
+        "SELECT skin1,skin2,skin3 FROM race_change_skins WHERE race = %u AND gender = %u",new_race,getGender());
+
+    if (!result)
+    {
+        sLog.outLog(LOG_RACE_CHANGE,"[%u] skins not found (race %u gender %u)",GetGUIDLow(),new_race,getGender());
+        return;
+    }
+    SetUInt32Value(PLAYER_BYTES,result->Fetch()[urand(0,2)].GetUInt32()); //face, hair, skin and hair color
+    SetByteValue(PLAYER_BYTES_2,0,0); //facial hair
 
     if (getGender() == GENDER_FEMALE)
     {
@@ -21227,19 +21247,21 @@ void Player::ChangeRace(uint8 new_race)
         SetDisplayId(new_info->displayId_m);
         SetNativeDisplayId(new_info->displayId_m);
     }
-
     uint32 unitbytes0 = GetUInt32Value(UNIT_FIELD_BYTES_0) & 0xFFFFFF00;
     unitbytes0 |= new_race;
     SetUInt32Value(UNIT_FIELD_BYTES_0, unitbytes0);
 
     //spells
-    const PlayerInfo* old_info = sObjectMgr.GetPlayerInfo(old_race,getClass());
-    std::list<CreateSpellPair>::const_iterator spell_itr;
-    for (spell_itr = old_info->spell.begin(); spell_itr!=old_info->spell.end(); ++spell_itr)
+    result = GameDataDatabase.PQuery("SELECT spell FROM race_change_spells WHERE race = %u AND class = %u",old_race,getClass());
+    Field* fields;
+    if (result)
     {
-        uint16 tspell = spell_itr->first;
-        if (tspell)
-            removeSpell(tspell);
+        do
+        {
+            fields = result->Fetch();
+            removeSpell(fields[0].GetUInt32());
+        }
+        while (result->NextRow());
     }
 
     if (getClass() == CLASS_PRIEST)
@@ -21257,16 +21279,21 @@ void Player::ChangeRace(uint8 new_race)
         removeSpell(44041);
     }
 
-    for (spell_itr = new_info->spell.begin(); spell_itr!=new_info->spell.end(); ++spell_itr)
+    result = GameDataDatabase.PQuery("SELECT spell FROM race_change_spells WHERE race = %u AND class = %u",new_race,getClass());
+    if (result)
     {
-        uint16 tspell = spell_itr->first;
-        if (tspell)
-            learnSpell(tspell);
+        do
+        {
+            fields = result->Fetch();
+            learnSpell(fields[0].GetUInt32());
+        }
+        while (result->NextRow());
     }
 
     //reps
     setFaction(Player::getFactionForRace(new_race));
-    GetReputationMgr().SwitchReputation(CapitalForRace[old_race],CapitalForRace[new_race]);
+    if (!GetReputationMgr().SwitchReputation(CapitalForRace[old_race],CapitalForRace[new_race]))
+        sLog.outLog(LOG_RACE_CHANGE,"[%u] Problem encountered while changing reputation",GetGUIDLow());
 
     //Mounts
     for (uint8 type = 0;type<7;type++){
@@ -21312,7 +21339,7 @@ void Player::ChangeRace(uint8 new_race)
             }
         }
     }
-    sLog.outLog(LOG_CHAR,"Race change for player %s [%u] succesful",GetName(),GetGUIDLow());
+    sLog.outLog(LOG_RACE_CHANGE,"[%u] Race change for player %s succesful",GetGUIDLow(),GetName());
 }
 
 void Player::SetCanWhisperToGM(bool on)
@@ -21327,4 +21354,36 @@ void Player::SetCanWhisperToGM(bool on)
         m_ExtraFlags &= ~PLAYER_EXTRA_CAN_WHISP_TO_GM;
         sSocialMgr.canWhisperToGMList.remove(GetGUID());
     }
+}
+
+bool Player::isInSanctuary()
+{
+    return HasFlag(PLAYER_FLAGS,PLAYER_FLAGS_SANCTUARY);
+}
+
+void Player::CumulativeACReport(AnticheatChecks check)
+{
+    if(check >= ANTICHEAT_CHECK_MAX)
+        return;
+
+    ++m_AC_cumulative_count[check];
+    if (m_AC_cumulative_timer[check] > time(NULL))
+    {
+        m_AC_cumulative_timer[check] = time(NULL) + sWorld.getConfig(CONFIG_ANTICHEAT_CUMULATIVE_DELAY);
+        uint32 report = 0;
+        switch (check)
+        {
+        case ANTICHEAT_CHECK_FLYHACK:
+            report = LANG_ANTICHEAT_FLY; break;
+        case ANTICHEAT_CHECK_WATERWALKHACK:
+            report = LANG_ANTICHEAT_WATERWALK; break;
+        default:
+            break;
+        }
+        if (report)
+            sWorld.SendGMText(report,GetName(),GetName(),m_AC_cumulative_count[check]);
+
+        m_AC_cumulative_count[check] = 0;
+    }
+
 }

@@ -536,10 +536,10 @@ struct boss_leotheras_the_blindAI : public ScriptedAI
             //Summon Inner Demon
             if(InnerDemons_Timer < diff)
             {
-                std::list<HostilReference *>& ThreatList = m_creature->getThreatManager().getThreatList();
+                std::list<HostileReference *>& ThreatList = m_creature->getThreatManager().getThreatList();
                 std::vector<Unit *> TargetList;
 
-                for(std::list<HostilReference *>::iterator itr = ThreatList.begin(); itr != ThreatList.end(); ++itr)
+                for(std::list<HostileReference *>::iterator itr = ThreatList.begin(); itr != ThreatList.end(); ++itr)
                 {
                     Unit *tempTarget = SelectUnit(SELECT_TARGET_RANDOM, 0, 100, true);
                     if(tempTarget && !tempTarget->HasAura(SPELL_CONSUMING_MADNESS,0) && tempTarget->GetGUID() != m_creature->getVictimGUID() && std::find(TargetList.begin(), TargetList.end(), tempTarget) == TargetList.end() && TargetList.size() < 5)
@@ -608,6 +608,7 @@ struct boss_leotheras_the_blindAI : public ScriptedAI
             if(Copy)
              {
                  Demon = Copy->GetGUID();
+                 Copy->SetMeleeDamageSchool(SPELL_SCHOOL_FIRE);
                 if (m_creature->getVictim())
                     Copy->AI()->AttackStart(m_creature->getVictim());
             }
@@ -669,10 +670,6 @@ struct boss_leotheras_the_blind_demonformAI : public ScriptedAI
         //Return since we have no target
         if (!UpdateVictim() )
             return;
-
-        if(m_creature->getVictim()->HasAura(30300,0))
-            DoResetThreat();
-
         if (checkTimer <= diff)
         {
             checkTimer = 2000;
@@ -704,7 +701,7 @@ struct mob_greyheart_spellbinderAI : public ScriptedAI
 {
     mob_greyheart_spellbinderAI(Creature *c) : ScriptedAI(c)
     {
-        pInstance = ((ScriptedInstance *)c->GetInstanceData());;
+        pInstance = ((ScriptedInstance *)c->GetInstanceData());
         leotherasGUID = 0;
     }
 
@@ -743,7 +740,7 @@ struct mob_greyheart_spellbinderAI : public ScriptedAI
 
     void JustRespawned()
     {
-        Reset();
+        EnterEvadeMode();
     }
 
     void CastChanneling()
@@ -782,7 +779,7 @@ struct mob_greyheart_spellbinderAI : public ScriptedAI
 
         if(pInstance && !pInstance->GetData64(DATA_LEOTHERAS_EVENT_STARTER))
         {
-            EnterEvadeMode();
+            Reset();
             return;
         }
 
